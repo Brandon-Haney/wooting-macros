@@ -10,7 +10,7 @@ import {
   Text,
   VStack
 } from '@chakra-ui/react'
-import { useMacroContext } from '../../contexts/macroContext'
+import { useOptionalMacroContext } from '../../contexts/macroContext'
 import {
   DEFAULT_HOLD_THRESHOLD_MS,
   MacroTypeDefinitions,
@@ -21,8 +21,20 @@ import { TapMode } from '../../types'
 
 /** Settings that depend on the macro type: repeat count, hold threshold and tap mode. */
 export default function BehaviourMacroSettings() {
+  const context = useOptionalMacroContext()
+  if (!context) {
+    return (
+      <Text fontSize="sm" opacity={0.8}>
+        Open a macro in the editor to change its behaviour settings.
+      </Text>
+    )
+  }
+  return <BehaviourMacroSettingsInner />
+}
+
+function BehaviourMacroSettingsInner() {
   const { macro, updateHoldThreshold, updateTapMode, updateRepeatCount } =
-    useMacroContext()
+    useOptionalMacroContext()!
   const isSingle = macro.macro_type === 'Single'
   const isToggle = macro.macro_type === 'Toggle'
   const isOnHold = macro.macro_type === 'OnHold'

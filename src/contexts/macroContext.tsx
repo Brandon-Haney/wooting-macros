@@ -52,6 +52,11 @@ const macroDefault: Macro = {
   repeat_count: null
 }
 
+/** Like useMacroContext, but returns undefined outside the macro editor instead of throwing. */
+function useOptionalMacroContext() {
+  return useContext(MacroContext)
+}
+
 function MacroProvider({ children }: MacroProviderProps) {
   const [macro, setMacro] = useState<Macro>(macroDefault)
   const [sequence, setSequence] = useState<ActionEventType[]>([])
@@ -439,4 +444,4 @@ function MacroProvider({ children }: MacroProviderProps) {
   return <MacroContext.Provider value={value}>{children}</MacroContext.Provider>
 }
 
-export { MacroProvider, useMacroContext }
+export { MacroProvider, useMacroContext, useOptionalMacroContext }
