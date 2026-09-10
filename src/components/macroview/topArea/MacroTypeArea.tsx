@@ -120,7 +120,7 @@ export default function MacroTypeArea() {
             variant="brand"
             placement="bottom"
             hasArrow
-            label="How long the trigger must be held before the macro starts repeating. Shorter presses are normal taps. 0 starts on press and swallows taps."
+            label="How long the trigger key must be held before the macro starts. A shorter press is treated as a normal tap of the key. 0 starts the macro on press and never passes taps through."
           >
             <Text fontSize={['xs', 'sm']} whiteSpace="nowrap">
               Hold after
@@ -150,17 +150,17 @@ export default function MacroTypeArea() {
             variant="brand"
             placement="bottom"
             hasArrow
-            label="Deferred tap: a short press is delivered as one tap when released, so the trigger key is never seen held. Pass through: the press reaches the application immediately, which also sees the key held until the macro starts."
+            label="What happens to the trigger press during the hold time, before it is known whether you are tapping or holding. Hold back the tap: the press is held back; a short press is sent as one quick tap when you release, and a long press starts the macro without the game ever seeing the key held down. Send press right away: the press reaches the game immediately, so taps have no delay, but the game sees the key held down until the macro starts."
           >
             <Select
               size="sm"
-              w="150px"
+              w="190px"
               value={tapMode}
               isDisabled={holdThreshold === 0}
               onChange={(event) => updateTapMode(event.target.value as TapMode)}
             >
-              <option value="DeferredTap">Deferred tap</option>
-              <option value="PassThrough">Pass through</option>
+              <option value="DeferredTap">Hold back the tap</option>
+              <option value="PassThrough">Send press right away</option>
             </Select>
           </Tooltip>
         </HStack>
