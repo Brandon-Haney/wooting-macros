@@ -24,7 +24,6 @@ import ClearSequenceModal from './ClearSequenceModal'
 import { RecordIcon, StopIcon } from '../../icons'
 import SortableList from './SortableList'
 import useMainBgColour from '../../../hooks/useMainBgColour'
-import { useApplicationContext } from '../../../contexts/applicationContext'
 
 interface Props {
   onOpenMacroSettingsModal: () => void
@@ -40,7 +39,6 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   } = useMacroContext()
   const { config } = useSettingsContext()
   const { isOpen, onOpen, onClose } = useDisclosure()
-  const { appDebugMode } = useApplicationContext()
 
   const onItemChanged = useCallback(
     (
@@ -203,13 +201,12 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         </Button>
 
         <Tooltip
-          label="Open Macro Advanced Settings (coming soon)"
+          label="Macro settings: repeat count, hold threshold, tap mode"
           hasArrow
           variant="brand"
         >
           <IconButton
             variant="brand"
-            isDisabled={!appDebugMode}
             aria-label="MacroSettings"
             icon={<SettingsIcon />}
             size={['xs', 'sm', 'md']}

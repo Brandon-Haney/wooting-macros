@@ -17,6 +17,7 @@ import useScrollbarStyles from '../hooks/useScrollbarStyles'
 import useMainBgColour from '../hooks/useMainBgColour'
 import NotificationMacroSettingsPanel from '../components/macrosettings/NotificationMacroSettingsPanel'
 import DefaultMacroSettings from '../components/macrosettings/DefaultMacroSettings'
+import BehaviourMacroSettings from '../components/macrosettings/BehaviourMacroSettings'
 import MacroSettingsLeftPanel from '../components/macrosettings/MacroSettingsLeftPanel'
 
 type Props = {
@@ -30,6 +31,10 @@ interface SettingsTabDefinition {
 }
 
 export const SettingTabs: SettingsTabDefinition[] = [
+  {
+    title: 'Behaviour',
+    component: () => <BehaviourMacroSettings />
+  },
   {
     title: 'Macro Defaults',
     component: () => <DefaultMacroSettings />
