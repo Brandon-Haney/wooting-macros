@@ -79,6 +79,15 @@ async fn list_processes() -> Result<Vec<String>, ()> {
     Ok(foreground::running_process_names())
 }
 
+#[tauri::command]
+/// Running programs (with window titles) and installed Steam games, for linking collections.
+async fn list_applications() -> Result<Vec<foreground::ApplicationEntry>, ()> {
+    // Scanning Steam libraries touches the disk: keep it off the async runtime threads.
+    tauri::async_runtime::spawn_blocking(foreground::list_applications)
+        .await
+        .map_err(|_| ())
+}
+
 /// Processes the requests macros make of the backend (enable/disable a collection) and tells the
 /// frontend when the macro data changed as a result.
 fn spawn_command_processor(app: tauri::AppHandle) {
@@ -240,7 +249,8 @@ async fn main() -> Result<(), Error> {
             set_config,
             control_grabbing,
             is_debug,
-            list_processes
+            list_processes,
+            list_applications
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;
