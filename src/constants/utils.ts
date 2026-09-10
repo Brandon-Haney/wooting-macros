@@ -84,6 +84,9 @@ export const checkIfElementIsEditable = (element: ActionEventType): boolean => {
           return true
         }
         return false
+      case 'Macro':
+      case 'Collection':
+        return true
       default:
         return false
     }
@@ -115,10 +118,19 @@ export const getElementDisplayString = (element: ActionEventType): string => {
             'error'
           )
         case 'Volume':
+        case 'Media':
           return (
             sysEventLookup.get(element.data.action.type)?.displayString ||
             'error'
           )
+        case 'Macro':
+          return element.data.action.data !== ''
+            ? `Run Macro: ${element.data.action.data}`
+            : 'Run Macro'
+        case 'Collection':
+          return element.data.action.data !== ''
+            ? `${element.data.action.type} Collection: ${element.data.action.data}`
+            : `${element.data.action.type} Collection`
         case 'Clipboard':
           if (
             element.data.action.type === 'PasteUserDefinedString' &&

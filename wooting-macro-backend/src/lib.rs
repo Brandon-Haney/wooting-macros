@@ -131,15 +131,55 @@ pub struct Macro {
     /// `OnHold` only, see `TapMode`.
     #[serde(default)]
     pub tap_mode: TapMode,
+    /// `Single`: how many times the sequence plays per trigger (default 1). `Toggle`: how many
+    /// loops before it stops on its own (default: until triggered again). Ignored by `OnHold`.
+    #[serde(default)]
+    pub repeat_count: Option<u32>,
 }
+
+/// Deepest chain of macros calling macros that is followed before giving up.
+const MAX_MACRO_CALL_DEPTH: u8 = 8;
 
 impl Macro {
     /// This function is used to execute a macro. It is called by the macro checker.
     /// It spawns async tasks to execute said events specifically.
     /// Make sure to expand this if you implement new action types.
-    async fn execute(&self, send_channel: UnboundedSender<rdev::EventType>) -> Result<()> {
+    ///
+    /// `depth` counts nested macro calls, see `MAX_MACRO_CALL_DEPTH`.
+    async fn execute(&self, context: &ExecutionContext, depth: u8) -> Result<()> {
+        let send_channel = context.channel.clone();
+
         for action in &self.sequence {
             match action {
+                ActionEventType::SystemEventAction {
+                    data: system_event::SystemAction::Macro { action },
+                } => {
+                    let system_event::MacroAction::Run { data: name } = action;
+                    if depth >= MAX_MACRO_CALL_DEPTH {
+                        bail!(
+                            "macro {:?} calls {:?} more than {} levels deep, stopping",
+                            self.name,
+                            name,
+                            MAX_MACRO_CALL_DEPTH
+                        );
+                    }
+                    let Some(target) = context.library.read().await.find_macro(name) else {
+                        bail!("macro {:?} calls unknown macro {:?}", self.name, name);
+                    };
+                    debug!("Macro {:?} runs macro {:?}", self.name, target.name);
+                    Box::pin(target.execute(context, depth + 1)).await?;
+                }
+                ActionEventType::SystemEventAction {
+                    data: system_event::SystemAction::Collection { action },
+                } => {
+                    context
+                        .commands
+                        .send(BackendCommand::SetCollectionActive {
+                            name: action.name().to_string(),
+                            mode: action.mode(),
+                        })
+                        .map_err(|_| Error::msg("backend command channel closed"))?;
+                }
                 ActionEventType::KeyPressEventAction { data } => match data.keytype {
                     key_press::KeyType::Down => {
                         // One key press down
@@ -339,11 +379,25 @@ fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// Something a macro asks the backend to do that needs the whole backend, not just the executor.
+/// Processed by the host (`MacroBackend::take_command_receiver`), which can also tell the UI.
+#[derive(Debug, Clone)]
+pub enum BackendCommand {
+    SetCollectionActive {
+        name: String,
+        mode: system_event::CollectionMode,
+    },
+}
+
 /// Everything the grab hook needs to start, stop and keep track of macro executions.
 #[derive(Debug, Clone)]
 struct ExecutionContext {
     /// Sender side of the executor channel, see `keypress_executor_sender`.
     channel: UnboundedSender<rdev::EventType>,
+    /// All macros, for macros that call other macros.
+    library: Arc<RwLock<MacroData>>,
+    /// Requests for the backend host, see `BackendCommand`.
+    commands: UnboundedSender<BackendCommand>,
     running: RunningMacros,
     injected: InjectedEvents,
     is_listening: Arc<AtomicBool>,
@@ -362,6 +416,9 @@ pub struct MacroBackend {
     pub running: RunningMacros,
     /// Executable name of the application owning the foreground window, as last reported.
     foreground: Arc<Mutex<Option<String>>>,
+    command_sender: UnboundedSender<BackendCommand>,
+    /// Taken once by the host with `take_command_receiver`.
+    command_receiver: Mutex<Option<UnboundedReceiver<BackendCommand>>>,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -466,6 +523,52 @@ impl Collection {
 }
 
 impl MacroData {
+    /// Finds a macro by name (case-insensitive), in any collection. The first match wins.
+    pub fn find_macro(&self, name: &str) -> Option<Macro> {
+        let name = name.trim();
+        self.data
+            .iter()
+            .flat_map(|collection| collection.macros.iter())
+            .find(|macros| macros.name.trim().eq_ignore_ascii_case(name))
+            .cloned()
+    }
+
+    /// Enables, disables or toggles the collection with the given name (case-insensitive).
+    /// Returns whether the state changed. Collections linked to applications are left alone.
+    pub fn set_collection_active(&mut self, name: &str, mode: system_event::CollectionMode) -> bool {
+        let name = name.trim();
+        let Some(collection) = self
+            .data
+            .iter_mut()
+            .find(|collection| collection.name.trim().eq_ignore_ascii_case(name))
+        else {
+            warn!("No collection named {:?} to {:?}", name, mode);
+            return false;
+        };
+        if collection.is_linked() {
+            warn!(
+                "Collection {:?} is controlled by its linked applications, ignoring {:?}",
+                collection.name, mode
+            );
+            return false;
+        }
+        let active = match mode {
+            system_event::CollectionMode::Enable => true,
+            system_event::CollectionMode::Disable => false,
+            system_event::CollectionMode::Toggle => !collection.active,
+        };
+        if collection.active == active {
+            return false;
+        }
+        info!(
+            "Collection {:?} {} by a macro",
+            collection.name,
+            if active { "enabled" } else { "disabled" }
+        );
+        collection.active = active;
+        true
+    }
+
     /// Arms every linked collection whose application is in the foreground and disarms the other
     /// linked ones. Returns true if any collection changed state.
     pub fn apply_foreground_process(&mut self, process: Option<&str>) -> bool {
@@ -499,11 +602,15 @@ fn execute_macro(macros: Macro, context: &ExecutionContext) {
         MacroType::Single => {
             info!("\nEXECUTING A SINGLE MACRO: {:#?}", macros.name);
 
-            let cloned_channel = context.channel.clone();
+            let context = context.clone();
 
             task::spawn(async move {
-                if let Err(error) = macros.execute(cloned_channel).await {
-                    error!("error executing macro: {}", error);
+                let repeats = macros.repeat_count.unwrap_or(1).max(1);
+                for _ in 0..repeats {
+                    if let Err(error) = macros.execute(&context, 0).await {
+                        error!("error executing macro: {}", error);
+                        break;
+                    }
                 }
             });
         }
@@ -654,9 +761,9 @@ fn spawn_hold_timer(
 fn run_once(macros: Macro, context: &ExecutionContext) {
     lift_trigger_modifiers(&macros, context);
 
-    let channel = context.channel.clone();
+    let context = context.clone();
     task::spawn(async move {
-        if let Err(error) = macros.execute(channel).await {
+        if let Err(error) = macros.execute(&context, 0).await {
             error!("error executing macro: {}", error);
         }
     });
@@ -709,7 +816,7 @@ fn spawn_macro_loop(
     flag: Arc<AtomicBool>,
     context: &ExecutionContext,
 ) {
-    let channel = context.channel.clone();
+    let context = context.clone();
     let running = context.running.clone();
     let is_listening = context.is_listening.clone();
     let hook_events = context.hook_events.clone();
@@ -717,14 +824,22 @@ fn spawn_macro_loop(
     task::spawn(async move {
         let min_iteration = macros.min_loop_iteration();
         let injects_events = macros.injected_event_count() > 0;
+        // A toggle can be limited to a number of loops; on-hold always runs until released.
+        let max_iterations: Option<u64> = match macros.macro_type {
+            MacroType::Toggle => macros.repeat_count.filter(|n| *n > 0).map(u64::from),
+            _ => None,
+        };
         let mut iterations: u64 = 0;
         let mut hook_stalled_since: Option<time::Instant> = None;
 
-        while flag.load(Ordering::Relaxed) && is_listening.load(Ordering::Relaxed) {
+        while flag.load(Ordering::Relaxed)
+            && is_listening.load(Ordering::Relaxed)
+            && max_iterations.is_none_or(|max| iterations < max)
+        {
             let started = time::Instant::now();
             let hook_events_before = hook_events.load(Ordering::Relaxed);
 
-            if let Err(error) = macros.execute(channel.clone()).await {
+            if let Err(error) = macros.execute(&context, 0).await {
                 error!("error executing looping macro: {}", error);
                 break;
             }
@@ -1034,6 +1149,31 @@ impl MacroBackend {
         Ok(adjusted.then_some(macros))
     }
 
+    /// Hands the receiving end of the macro command channel to the host. Can be taken once.
+    pub fn take_command_receiver(&self) -> Option<UnboundedReceiver<BackendCommand>> {
+        lock_or_recover(&self.command_receiver).take()
+    }
+
+    /// Enables, disables or toggles a collection on behalf of a macro. Returns the data if the
+    /// state changed, so the frontend can be told.
+    pub async fn set_collection_active(
+        &self,
+        name: &str,
+        mode: system_event::CollectionMode,
+    ) -> Result<Option<MacroData>> {
+        let mut data = self.data.write().await;
+        if !data.set_collection_active(name, mode) {
+            return Ok(None);
+        }
+
+        data.write_to_file()?;
+        let triggers = data.extract_triggers()?;
+        self.stop_loops_not_in(&triggers);
+        *self.triggers.write().await = triggers;
+
+        Ok(Some(data.clone()))
+    }
+
     /// Reports which application owns the foreground window (`None` if unknown) and arms or
     /// disarms the collections linked to applications accordingly.
     ///
@@ -1076,6 +1216,8 @@ impl MacroBackend {
 
         let context = ExecutionContext {
             channel: schan_execute,
+            library: self.data.clone(),
+            commands: self.command_sender.clone(),
             running: self.running.clone(),
             injected: InjectedEvents::default(),
             is_listening: self.is_listening.clone(),
@@ -1088,10 +1230,72 @@ impl MacroBackend {
             keypress_executor_sender(rchan_execute, executor_injected);
         });
 
-        let _grabber = task::spawn_blocking(move || {
-            let keys_pressed: KeysPressed = KeysPressed::default();
+        spawn_grab_thread(&context, &inner_triggers);
+        spawn_hook_supervisor(context, inner_triggers);
 
-            rdev::grab(move |event: rdev::Event| {
+        Err(anyhow::Error::msg("Error in grabbing thread!"))
+    }
+}
+
+/// How often the supervisor asks the hook thread to re-install its hooks (Windows silently
+/// removes low-level hooks that stopped responding, e.g. across a lock screen, see issue #228).
+const HOOK_REHOOK_INTERVAL: time::Duration = time::Duration::from_secs(10);
+/// How long the hook thread gets to acknowledge a re-hook before it is considered stuck.
+const HOOK_ACK_TIMEOUT: time::Duration = time::Duration::from_secs(2);
+
+/// Starts a thread running the input hook with a fresh callback.
+fn spawn_grab_thread(context: &ExecutionContext, triggers: &Arc<RwLock<MacroTriggerLookup>>) {
+    let callback = grab_callback(context.clone(), triggers.clone());
+
+    // The callback spawns tasks, so the thread has to belong to the runtime.
+    task::spawn_blocking(move || {
+        if let Err(error) = rdev::grab(callback) {
+            error!("Input hook stopped: {:?}", error);
+        }
+    });
+}
+
+/// Keeps the input hook alive: periodically re-installs it, and replaces the hook thread if it
+/// stops responding.
+fn spawn_hook_supervisor(context: ExecutionContext, triggers: Arc<RwLock<MacroTriggerLookup>>) {
+    if !cfg!(target_os = "windows") {
+        return;
+    }
+
+    task::spawn(async move {
+        loop {
+            tokio::time::sleep(HOOK_REHOOK_INTERVAL).await;
+
+            // Re-installing while a trigger is held could lose its release: wait for quiet.
+            if !lock_or_recover(&context.running).is_empty() {
+                continue;
+            }
+
+            let before = rdev::rehook_count();
+            let requested = rdev::request_rehook();
+            if requested {
+                tokio::time::sleep(HOOK_ACK_TIMEOUT).await;
+            }
+
+            if !requested || rdev::rehook_count() == before {
+                warn!("The input hook thread is not responding, starting a new one");
+                rdev::unhook();
+                spawn_grab_thread(&context, &triggers);
+            } else {
+                debug!("Input hook re-installed");
+            }
+        }
+    });
+}
+
+/// Builds the grab hook callback: the whole input processing pipeline.
+fn grab_callback(
+    context: ExecutionContext,
+    inner_triggers: Arc<RwLock<MacroTriggerLookup>>,
+) -> impl Fn(rdev::Event) -> Option<rdev::Event> {
+    let keys_pressed: KeysPressed = KeysPressed::default();
+
+    move |event: rdev::Event| {
                 context.hook_events.fetch_add(1, Ordering::Relaxed);
 
                 // Our own output (stamped by the rdev fork): let it through untouched, it is
@@ -1258,9 +1462,6 @@ impl MacroBackend {
                 } else {
                     Some(event)
                 }
-            })
-        });
-        Err(anyhow::Error::msg("Error in grabbing thread!"))
     }
 }
 
@@ -1273,6 +1474,7 @@ impl Default for MacroBackend {
         let triggers = macro_data
             .extract_triggers()
             .expect("error extracting triggers");
+        let (command_sender, command_receiver) = tokio::sync::mpsc::unbounded_channel();
         MacroBackend {
             data: Arc::new(RwLock::from(macro_data)),
             config: Arc::new(RwLock::from(
@@ -1282,6 +1484,8 @@ impl Default for MacroBackend {
             is_listening: Arc::new(AtomicBool::new(true)),
             running: RunningMacros::default(),
             foreground: Arc::new(Mutex::new(None)),
+            command_sender,
+            command_receiver: Mutex::new(Some(command_receiver)),
         }
     }
 }

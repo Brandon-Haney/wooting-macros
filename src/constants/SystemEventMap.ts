@@ -89,6 +89,88 @@ export class SystemEvent {
     }
   }
 
+  static get ToggleMicrophoneMute(): SystemEventInfo {
+    return {
+      type: 'Volume',
+      subtype: 'ToggleMicrophoneMute',
+      displayString: 'Toggle Mute Microphone',
+      defaultData: { type: 'Volume', action: { type: 'ToggleMicrophoneMute' } },
+      description: 'Mutes or unmutes your default communication microphone.'
+    }
+  }
+  static get NextTrack(): SystemEventInfo {
+    return {
+      type: 'Media',
+      subtype: 'NextTrack',
+      displayString: 'Next Track',
+      defaultData: { type: 'Media', action: { type: 'NextTrack' } },
+      description: 'Skips to the next media track.'
+    }
+  }
+  static get PreviousTrack(): SystemEventInfo {
+    return {
+      type: 'Media',
+      subtype: 'PrevTrack',
+      displayString: 'Previous Track',
+      defaultData: { type: 'Media', action: { type: 'PrevTrack' } },
+      description: 'Goes back to the previous media track.'
+    }
+  }
+  static get StopTrack(): SystemEventInfo {
+    return {
+      type: 'Media',
+      subtype: 'StopTrack',
+      displayString: 'Stop Media',
+      defaultData: { type: 'Media', action: { type: 'StopTrack' } },
+      description: 'Stops media playback.'
+    }
+  }
+  static get PlayPauseTrack(): SystemEventInfo {
+    return {
+      type: 'Media',
+      subtype: 'PlayPauseTrack',
+      displayString: 'Play/Pause Media',
+      defaultData: { type: 'Media', action: { type: 'PlayPauseTrack' } },
+      description: 'Plays or pauses media playback.'
+    }
+  }
+  static get RunMacro(): SystemEventInfo {
+    return {
+      type: 'Macro',
+      subtype: 'Run',
+      displayString: 'Run Macro',
+      defaultData: { type: 'Macro', action: { type: 'Run', data: '' } },
+      description: 'Plays another macro as part of this one.'
+    }
+  }
+  static get EnableCollection(): SystemEventInfo {
+    return {
+      type: 'Collection',
+      subtype: 'Enable',
+      displayString: 'Enable Collection',
+      defaultData: { type: 'Collection', action: { type: 'Enable', data: '' } },
+      description: 'Turns a collection on.'
+    }
+  }
+  static get DisableCollection(): SystemEventInfo {
+    return {
+      type: 'Collection',
+      subtype: 'Disable',
+      displayString: 'Disable Collection',
+      defaultData: { type: 'Collection', action: { type: 'Disable', data: '' } },
+      description: 'Turns a collection off.'
+    }
+  }
+  static get ToggleCollection(): SystemEventInfo {
+    return {
+      type: 'Collection',
+      subtype: 'Toggle',
+      displayString: 'Toggle Collection',
+      defaultData: { type: 'Collection', action: { type: 'Toggle', data: '' } },
+      description: 'Turns a collection on if it is off, and off if it is on.'
+    }
+  }
+
   static readonly all: SystemEventInfo[] = [
     SystemEvent.OpenFile,
     SystemEvent.OpenFolder,
@@ -98,6 +180,15 @@ export class SystemEvent {
     SystemEvent.IncreaseVolume,
     SystemEvent.DecreaseVolume,
     SystemEvent.ToggleMuteVolume,
+    SystemEvent.ToggleMicrophoneMute,
+    SystemEvent.PlayPauseTrack,
+    SystemEvent.NextTrack,
+    SystemEvent.PreviousTrack,
+    SystemEvent.StopTrack,
+    SystemEvent.RunMacro,
+    SystemEvent.EnableCollection,
+    SystemEvent.DisableCollection,
+    SystemEvent.ToggleCollection
   ]
 }
 

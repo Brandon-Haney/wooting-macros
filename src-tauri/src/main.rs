@@ -79,6 +79,36 @@ async fn list_processes() -> Result<Vec<String>, ()> {
     Ok(foreground::running_process_names())
 }
 
+/// Processes the requests macros make of the backend (enable/disable a collection) and tells the
+/// frontend when the macro data changed as a result.
+fn spawn_command_processor(app: tauri::AppHandle) {
+    let backend = app.state::<MacroBackend>();
+    let Some(mut commands) = backend.take_command_receiver() else {
+        error!("backend command receiver already taken");
+        return;
+    };
+
+    tauri::async_runtime::spawn(async move {
+        while let Some(command) = commands.recv().await {
+            let backend = app.state::<MacroBackend>();
+            let result = match command {
+                BackendCommand::SetCollectionActive { name, mode } => {
+                    backend.set_collection_active(&name, mode).await
+                }
+            };
+            match result {
+                Ok(Some(data)) => {
+                    if let Err(err) = app.emit_all(MACRO_DATA_UPDATED_EVENT, data) {
+                        error!("error notifying the frontend of a collection change: {}", err);
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => error!("error executing a backend command: {}", err),
+            }
+        }
+    });
+}
+
 /// Interval at which the foreground application is checked.
 const FOREGROUND_POLL_INTERVAL: time::Duration = time::Duration::from_millis(250);
 
@@ -219,6 +249,7 @@ async fn main() -> Result<(), Error> {
             });
 
             spawn_foreground_watcher(app.handle());
+            spawn_command_processor(app.handle());
 
             Ok(())
         })

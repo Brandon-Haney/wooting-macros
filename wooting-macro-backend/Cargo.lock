@@ -3605,7 +3605,7 @@ dependencies = [
 [[package]]
 name = "rdev"
 version = "0.6.3"
-source = "git+https://github.com/Brandon-Haney/rdev?branch=injected-flag#4fdf60655ddd8d6a8e6b732845cfd431dfe33608"
+source = "git+https://github.com/Brandon-Haney/rdev?branch=injected-flag#69c5b1adf92eecc411491e0cfdf78afd95fa602e"
 dependencies = [
  "cocoa 0.25.0",
  "core-foundation",
@@ -5540,6 +5540,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows"
+version = "0.52.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48a53791691ab099e5e2ad123536d0fff50652600abaf43bbf952894110d0be"
+dependencies = [
+ "windows-core 0.52.0",
+ "windows-targets 0.52.0",
+]
+
+[[package]]
 name = "windows-bindgen"
 version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5915,6 +5925,7 @@ dependencies = [
  "tokio",
  "tokio-serde",
  "url",
+ "windows 0.52.0",
  "windows-sys 0.52.0",
 ]
 

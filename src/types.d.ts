@@ -40,6 +40,7 @@ export type MacroState = {
   updateMacroType: (newType: MacroType) => void
   updateHoldThreshold: (milliseconds: number) => void
   updateTapMode: (mode: TapMode) => void
+  updateRepeatCount: (count: number | null) => void
   updateTrigger: (newElement: TriggerEventType) => void
   updateAllowWhileOtherKeys: (value: boolean) => void
   onElementAdd: (newElement: ActionEventType) => void
@@ -123,6 +124,8 @@ export interface Macro {
   hold_threshold_ms?: number
   /** OnHold only. */
   tap_mode?: TapMode
+  /** Single: plays per trigger (default 1). Toggle: loops before stopping (null = until triggered again). */
+  repeat_count?: number | null
 }
 
 export interface Collection {
@@ -177,6 +180,9 @@ export type SystemAction =
   | { type: 'Open'; action: DirectoryAction }
   | { type: 'Volume'; action: VolumeAction }
   | { type: 'Clipboard'; action: ClipboardAction }
+  | { type: 'Media'; action: MediaAction }
+  | { type: 'Macro'; action: MacroCallAction }
+  | { type: 'Collection'; action: CollectionAction }
 // | { type: 'Brightness'; action: MonitorBrightnessAction }
 
 export type DirectoryAction =
@@ -196,6 +202,22 @@ export type VolumeAction =
   | { type: 'LowerVolume' }
   | { type: 'IncreaseVolume' }
   | { type: 'ToggleMute' }
+  | { type: 'ToggleMicrophoneMute' }
+
+export type MediaAction =
+  | { type: 'NextTrack' }
+  | { type: 'PrevTrack' }
+  | { type: 'StopTrack' }
+  | { type: 'PlayPauseTrack' }
+
+/** Runs another macro by name. */
+export type MacroCallAction = { type: 'Run'; data: string }
+
+/** Enables, disables or toggles a collection by name. */
+export type CollectionAction =
+  | { type: 'Enable'; data: string }
+  | { type: 'Disable'; data: string }
+  | { type: 'Toggle'; data: string }
 
 export type MonitorBrightnessAction =
   | { type: 'SetAll'; level: number }

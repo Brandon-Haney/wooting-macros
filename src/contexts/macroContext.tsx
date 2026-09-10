@@ -48,7 +48,8 @@ const macroDefault: Macro = {
   trigger: { type: 'KeyPressEvent', data: [], allow_while_other_keys: false },
   sequence: [],
   hold_threshold_ms: DEFAULT_HOLD_THRESHOLD_MS,
-  tap_mode: 'DeferredTap'
+  tap_mode: 'DeferredTap',
+  repeat_count: null
 }
 
 function MacroProvider({ children }: MacroProviderProps) {
@@ -198,6 +199,16 @@ function MacroProvider({ children }: MacroProviderProps) {
   const updateTapMode = useCallback(
     (mode: TapMode) => {
       setMacro({ ...macro, tap_mode: mode })
+    },
+    [macro, setMacro]
+  )
+
+  const updateRepeatCount = useCallback(
+    (count: number | null) => {
+      setMacro({
+        ...macro,
+        repeat_count: count === null ? null : Math.max(0, Math.round(count))
+      })
     },
     [macro, setMacro]
   )
@@ -378,6 +389,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroType,
       updateHoldThreshold,
       updateTapMode,
+      updateRepeatCount,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,
@@ -406,6 +418,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroType,
       updateHoldThreshold,
       updateTapMode,
+      updateRepeatCount,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,

@@ -8,7 +8,17 @@ use rdev;
 use tokio::sync::mpsc::UnboundedSender;
 use url::Url;
 
-use super::util;
+use super::{audio, util};
+
+/// Virtual-key codes of the media keys, which rdev has no named variant for.
+const VK_MEDIA_NEXT_TRACK: u32 = 0xB0;
+const VK_MEDIA_PREV_TRACK: u32 = 0xB1;
+const VK_MEDIA_STOP: u32 = 0xB2;
+const VK_MEDIA_PLAY_PAUSE: u32 = 0xB3;
+
+/// How long the pasted text stays on the clipboard before the previous content is restored.
+/// Applications read the clipboard when they process the paste shortcut, which takes a moment.
+const PASTE_RESTORE_DELAY: time::Duration = time::Duration::from_millis(150);
 
 // Frequently used keys within the code.
 const COPY_HOTKEY: [rdev::Key; 2] = [rdev::Key::ControlLeft, rdev::Key::KeyC];
@@ -29,6 +39,11 @@ pub enum SystemAction {
     Open { action: DirectoryAction },
     Volume { action: VolumeAction },
     Clipboard { action: ClipboardAction },
+    Media { action: MediaAction },
+    /// Handled by `Macro::execute`, which has access to the macro library.
+    Macro { action: MacroAction },
+    /// Handled by `Macro::execute`, which can reach the backend.
+    Collection { action: CollectionAction },
 }
 
 impl SystemAction {
@@ -54,7 +69,23 @@ impl SystemAction {
                 VolumeAction::IncreaseVolume => {
                     util::direct_send_key(&send_channel, vec![rdev::Key::VolumeUp]).await?;
                 }
+                VolumeAction::ToggleMicrophoneMute => {
+                    let muted = audio::toggle_microphone_mute()?;
+                    log::info!("Microphone {}", if muted { "muted" } else { "unmuted" });
+                }
             },
+            SystemAction::Media { action } => {
+                let code = match action {
+                    MediaAction::NextTrack => VK_MEDIA_NEXT_TRACK,
+                    MediaAction::PrevTrack => VK_MEDIA_PREV_TRACK,
+                    MediaAction::StopTrack => VK_MEDIA_STOP,
+                    MediaAction::PlayPauseTrack => VK_MEDIA_PLAY_PAUSE,
+                };
+                util::direct_send_key(&send_channel, vec![rdev::Key::Unknown(code)]).await?;
+            }
+            SystemAction::Macro { .. } | SystemAction::Collection { .. } => {
+                // Intercepted earlier by Macro::execute; nothing to do here.
+            }
             SystemAction::Clipboard { action } => match action {
                 ClipboardAction::SetClipboard { data } => {
                     ClipboardContext::new()
@@ -76,12 +107,23 @@ impl SystemAction {
                 }
 
                 ClipboardAction::PasteUserDefinedString { data } => {
-                    ClipboardContext::new()
-                        .map_err(|err| anyhow::Error::msg(err.to_string()))?
-                        .set_contents(data.to_owned())
+                    let mut ctx = ClipboardContext::new()
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+
+                    // Keep whatever the user had on the clipboard; non-text content can't be
+                    // preserved this way and is lost, as before.
+                    let previous = ctx.get_contents().ok();
+
+                    ctx.set_contents(data.to_owned())
                         .map_err(|err| anyhow::Error::msg(err.to_string()))?;
 
                     util::direct_send_hotkey(&send_channel, PASTE_HOTKEY.to_vec()).await?;
+
+                    if let Some(previous) = previous {
+                        tokio::time::sleep(PASTE_RESTORE_DELAY).await;
+                        ctx.set_contents(previous)
+                            .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+                    }
                 }
 
                 ClipboardAction::Sarcasm => {
@@ -148,4 +190,58 @@ pub enum VolumeAction {
     LowerVolume,
     IncreaseVolume,
     ToggleMute,
+    /// Mutes or unmutes the default communication microphone (Windows only).
+    ToggleMicrophoneMute,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]
+#[serde(tag = "type")]
+/// Media player control keys.
+pub enum MediaAction {
+    NextTrack,
+    PrevTrack,
+    StopTrack,
+    PlayPauseTrack,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]
+#[serde(tag = "type")]
+/// Runs another macro (by name) as part of this one.
+pub enum MacroAction {
+    Run { data: String },
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]
+/// How a `CollectionAction` changes the collection's state.
+pub enum CollectionMode {
+    Enable,
+    Disable,
+    Toggle,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]
+#[serde(tag = "type")]
+/// Enables, disables or toggles a collection (by name).
+pub enum CollectionAction {
+    Enable { data: String },
+    Disable { data: String },
+    Toggle { data: String },
+}
+
+impl CollectionAction {
+    pub fn name(&self) -> &str {
+        match self {
+            CollectionAction::Enable { data }
+            | CollectionAction::Disable { data }
+            | CollectionAction::Toggle { data } => data,
+        }
+    }
+
+    pub fn mode(&self) -> CollectionMode {
+        match self {
+            CollectionAction::Enable { .. } => CollectionMode::Enable,
+            CollectionAction::Disable { .. } => CollectionMode::Disable,
+            CollectionAction::Toggle { .. } => CollectionMode::Toggle,
+        }
+    }
 }
