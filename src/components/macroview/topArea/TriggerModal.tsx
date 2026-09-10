@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   Divider,
   Flex,
   HStack,
@@ -31,7 +32,11 @@ interface Props {
 }
 
 export default function TriggerModal({ isOpen, onClose }: Props) {
-  const { macro, updateTrigger } = useMacroContext()
+  const { macro, updateTrigger, updateAllowWhileOtherKeys } = useMacroContext()
+  const allowWhileOtherKeys =
+    macro.trigger.type === 'KeyPressEvent'
+      ? macro.trigger.allow_while_other_keys
+      : false
   const { recording, startRecording, stopRecording, items, resetItems } =
     useRecordingTrigger(macro.trigger.data)
   const isTriggerMousepress = useMemo(() => {
@@ -92,7 +97,7 @@ export default function TriggerModal({ isOpen, onClose }: Props) {
           ...macro.trigger,
           type: 'KeyPressEvent',
           data: items,
-          allow_while_other_keys: false
+          allow_while_other_keys: true
         })
       }
     }
@@ -182,6 +187,20 @@ export default function TriggerModal({ isOpen, onClose }: Props) {
                   <Text fontSize="sm">
                     non-modifier key must be the last in sequence.
                   </Text>
+                  {!isTriggerMousepress && (
+                    <Checkbox
+                      size="sm"
+                      isChecked={allowWhileOtherKeys}
+                      onChange={(event) =>
+                        updateAllowWhileOtherKeys(event.target.checked)
+                      }
+                    >
+                      <Text fontSize="sm">
+                        Trigger even while other keys are held (e.g. Shift or
+                        W in a game)
+                      </Text>
+                    </Checkbox>
+                  )}
                 </VStack>
                 <Button
                   variant="brandRecord"

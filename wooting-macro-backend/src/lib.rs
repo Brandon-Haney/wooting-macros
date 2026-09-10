@@ -1016,7 +1016,13 @@ fn check_macro_execution_efficiently(
     let mut output = false;
     for macros in &trigger_overview {
         let matched = match &macros.trigger {
-            TriggerEventType::KeyPressEvent { data, .. } => match data.len() {
+            TriggerEventType::KeyPressEvent {
+                data,
+                allow_while_other_keys,
+            } => match data.len() {
+                // Strict: the trigger key is the only key down. Relaxed: the trigger key is
+                // the one just pressed, whatever else is held (Shift, W while moving, ...).
+                1 if *allow_while_other_keys => pressed_events.last() == data.first(),
                 1 => pressed_events == *data,
                 // This check makes sure the modifier keys (up to 3 keys in each trigger) can be of any order, and ensures the last key must match to the proper one.
                 2..=4 => {
@@ -1366,18 +1372,26 @@ fn grab_callback(
                                     .collect::<Vec<rdev::Key>>()
                             );
 
-                            let first_key: u32 = pressed_keys_copy_converted
-                                .first()
-                                .copied()
-                                .unwrap_or_default();
-
-                            let trigger_list = inner_triggers.blocking_read().clone();
-
-                            let check_these_macros = trigger_list
-                                .get(&first_key)
-                                .cloned()
-                                .unwrap_or_default()
-                                .to_vec();
+                            // Candidates are indexed by their first trigger key. Look them up
+                            // by every held key so a trigger still matches with other keys down
+                            // (multi-key triggers are indexed under each modifier).
+                            let check_these_macros: Vec<Macro> = {
+                                let trigger_list = inner_triggers.blocking_read();
+                                let mut candidates: Vec<Macro> = Vec::new();
+                                for hid in &pressed_keys_copy_converted {
+                                    for candidate in trigger_list.get(hid).into_iter().flatten() {
+                                        let duplicate = candidates.iter().any(|known| {
+                                            known.name == candidate.name
+                                                && TriggerKey::from(&known.trigger)
+                                                    == TriggerKey::from(&candidate.trigger)
+                                        });
+                                        if !duplicate {
+                                            candidates.push(candidate.clone());
+                                        }
+                                    }
+                                }
+                                candidates
+                            };
 
                             // ? up the pressed keys here right away?
 

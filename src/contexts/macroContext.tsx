@@ -45,7 +45,7 @@ const macroDefault: Macro = {
   icon: ':smile:',
   active: true,
   macro_type: 'Single',
-  trigger: { type: 'KeyPressEvent', data: [], allow_while_other_keys: false },
+  trigger: { type: 'KeyPressEvent', data: [], allow_while_other_keys: true },
   sequence: [],
   hold_threshold_ms: DEFAULT_HOLD_THRESHOLD_MS,
   tap_mode: 'DeferredTap',
