@@ -65,10 +65,10 @@ async fn set_macros(
 #[tauri::command]
 async fn is_debug() -> Result<bool, String> {
     if let Ok(result) = std::env::var(DEBUG_ENVVAR) {
-        return Ok(
+        Ok(
             log::LevelFilter::from_str(result.as_str()).map_err(|err| err.to_string())?
                 >= log::LevelFilter::Debug,
-        );
+        )
     } else {
         Ok(false)
     }
@@ -164,7 +164,7 @@ async fn main() -> Result<(), Error> {
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;
-            init_autostart(&app_name, set_autolaunch).unwrap_or_else(|err| {
+            init_autostart(app_name, set_autolaunch).unwrap_or_else(|err| {
                 error!("error changing the autostart options: {}", err.to_string())
             });
 
