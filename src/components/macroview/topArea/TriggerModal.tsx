@@ -187,7 +187,7 @@ export default function TriggerModal({ isOpen, onClose }: Props) {
                   <Text fontSize="sm">
                     non-modifier key must be the last in sequence.
                   </Text>
-                  {!isTriggerMousepress && (
+                  {!(items.length > 0 && checkIfMouseButtonArray(items)) && (
                     <Checkbox
                       size="sm"
                       isChecked={allowWhileOtherKeys}

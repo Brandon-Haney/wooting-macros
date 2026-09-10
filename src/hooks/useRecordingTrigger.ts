@@ -18,7 +18,11 @@ export default function useRecordingTrigger(
       return [initialItems]
     }
   })
-  const [prevItems, setPrevItems] = useState<number[]>([])
+  // Closing the dialog without recording restores this, so it must start as the current
+  // trigger rather than empty.
+  const [prevItems, setPrevItems] = useState<number[]>(() =>
+    Array.isArray(initialItems) ? initialItems : [initialItems]
+  )
   const toast = useToast()
 
   const resetItems = useCallback(() => {
