@@ -39,7 +39,7 @@ export default function ApplicationSettingsPanel() {
         <Divider />
         <ToggleSetting
           title="Minimize on close"
-          description="Pressing X will minimize the app instead of closing it."
+          description="Closing the window with the close button in its top-right corner hides the app to the system tray instead of quitting it, so macros keep working. Use Quit in the tray icon menu to exit."
           value={config.MinimizeToTray}
           onChange={updateMinimizeOnClose}
         />
