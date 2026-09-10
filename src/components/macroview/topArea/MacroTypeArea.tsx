@@ -150,17 +150,17 @@ export default function MacroTypeArea() {
             variant="brand"
             placement="bottom"
             hasArrow
-            label="What happens to the trigger press during the hold time, before it is known whether you are tapping or holding. Hold back the tap: the press is held back; a short press is sent as one quick tap when you release, and a long press starts the macro without the game ever seeing the key held down. Send press right away: the press reaches the game immediately, so taps have no delay, but the game sees the key held down until the macro starts."
+            label="What happens to the trigger press during the hold time, before it is known whether you are tapping or holding. Deferred tap: the press is held back; a short press is sent as one quick tap when you release, and a long press starts the macro without the game ever seeing the key held down. Pass through: the press reaches the game immediately, so taps have no delay, but the game sees the key held down until the macro starts."
           >
             <Select
               size="sm"
-              w="190px"
+              w="150px"
               value={tapMode}
               isDisabled={holdThreshold === 0}
               onChange={(event) => updateTapMode(event.target.value as TapMode)}
             >
-              <option value="DeferredTap">Hold back the tap</option>
-              <option value="PassThrough">Send press right away</option>
+              <option value="DeferredTap">Deferred tap</option>
+              <option value="PassThrough">Pass through</option>
             </Select>
           </Tooltip>
         </HStack>
