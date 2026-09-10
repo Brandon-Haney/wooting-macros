@@ -88,6 +88,11 @@ function App() {
             isEditing={false}
             onOpenMacroSettingsModal={onOpenMacroSettings}
           />
+          {/* Inside the provider so the settings can edit the macro being built. */}
+          <MacroSettingsModal
+            isOpen={isOpenMacroSettings}
+            onClose={onCloseMacroSettings}
+          />
         </MacroProvider>
       )}
       {viewState === ViewState.Editview && (
@@ -96,13 +101,13 @@ function App() {
             isEditing={true}
             onOpenMacroSettingsModal={onOpenMacroSettings}
           />
+          <MacroSettingsModal
+            isOpen={isOpenMacroSettings}
+            onClose={onCloseMacroSettings}
+          />
         </MacroProvider>
       )}
       <SettingsModal isOpen={isOpenSettings} onClose={onCloseSettings} />
-      <MacroSettingsModal
-        isOpen={isOpenMacroSettings}
-        onClose={onCloseMacroSettings}
-      />
     </Flex>
   )
 }
