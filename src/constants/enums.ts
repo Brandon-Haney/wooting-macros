@@ -4,18 +4,21 @@ export enum ViewState {
   Editview
 }
 
-/** Currently unused */
+/** Mirrors the backend `MacroType` enum: the string name is what gets serialized. */
 export enum MacroType {
   Single,
   Toggle,
-  OnHold // TODO: need to add space later when displaying the macro type name text
+  OnHold
 }
 
-/** Currently unused */
+/** Display names for each MacroType, in enum order. */
+export const MacroTypeNames: string[] = ['Single', 'Toggle', 'On Hold']
+
+/** Help text for each MacroType, in enum order. */
 export const MacroTypeDefinitions: string[] = [
   'The macro will play once after the trigger key(s) is pressed.',
   'The macro will continuously repeat until the trigger key(s) is pressed again.',
-  'The macro will only play while the trigger key(s) is pressed.'
+  'The macro will repeat only while the trigger key(s) is held down.'
 ]
 
 export enum KeyType {

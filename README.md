@@ -8,6 +8,7 @@
 
 - **Create Macros:** Perform keystrokes, open applications, folders, and websites, paste text with emojis, and more.
 - **Organize your macros:** Group macros into specific collections, allowing you to toggle the entire collection on/off.
+- **Single, Toggle or On Hold:** Play a macro once per press, keep it repeating until the trigger is pressed again, or repeat it only while the trigger is held down.
 - **Any Keyboard, Any Mouse:** You can bind the macros to be activated by any keyboard key or mouse button*.
 - **Open Source:** Want to help out? See below on how to get started.
 - **Windows & Linux:** Support for Windows 10/11 and most Linux distros**. MacOS support is on our radar.

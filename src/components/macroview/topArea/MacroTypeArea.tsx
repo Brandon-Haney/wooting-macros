@@ -3,11 +3,16 @@ import {
   IconButton,
   StackDivider,
   Text,
+  Tooltip,
   useColorModeValue
 } from '@chakra-ui/react'
 import { HiArrowDownTray, HiArrowPath, HiArrowRight } from 'react-icons/hi2'
 import { useMacroContext } from '../../../contexts/macroContext'
-import { MacroType } from '../../../constants/enums'
+import {
+  MacroType,
+  MacroTypeDefinitions,
+  MacroTypeNames
+} from '../../../constants/enums'
 import { checkIfStringIsNonNumeric } from '../../../constants/utils'
 
 export default function MacroTypeArea() {
@@ -23,7 +28,7 @@ export default function MacroTypeArea() {
       border="1px"
       borderColor={borderColour}
       divider={<StackDivider />}
-      rounded='md'
+      rounded="md"
       spacing="16px"
     >
       <Text fontWeight="semibold" fontSize={['sm', 'md']}>
@@ -33,16 +38,23 @@ export default function MacroTypeArea() {
         {(Object.keys(MacroType) as Array<keyof typeof MacroType>)
           .filter(checkIfStringIsNonNumeric)
           .map((value: string, index: number) => (
-            <IconButton
-              icon={typeIcons[index]}
-              aria-label="macro type"
-              size="sm"
-              colorScheme={
-                macro.macro_type === value ? 'primary-accent' : 'gray'
-              }
-              onClick={() => updateMacroType(index)}
+            <Tooltip
+              variant="brand"
+              label={`${MacroTypeNames[index]}: ${MacroTypeDefinitions[index]}`}
+              placement="bottom"
+              hasArrow
               key={value}
-            ></IconButton>
+            >
+              <IconButton
+                icon={typeIcons[index]}
+                aria-label={`${MacroTypeNames[index]} macro type`}
+                size="sm"
+                colorScheme={
+                  macro.macro_type === value ? 'primary-accent' : 'gray'
+                }
+                onClick={() => updateMacroType(index)}
+              ></IconButton>
+            </Tooltip>
           ))}
       </HStack>
     </HStack>
