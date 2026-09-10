@@ -133,15 +133,15 @@ export interface Collection {
   active: boolean
   macros: Macro[]
   icon: string
-  /** An application a collection can be linked to, from the backend's list_applications. */
+  /** Executable names; when set, the collection is armed only while one is focused. */
+  linked_processes?: string[]
+}
+
+/** An application a collection can be linked to, from the backend's list_applications. */
 export interface ApplicationEntry {
   exe: string
   label: string
   source: 'running' | 'background' | 'steam'
-}
-
-/** Executable names; when set, the collection is armed only while one is focused. */
-  linked_processes?: string[]
 }
 
 declare global {
