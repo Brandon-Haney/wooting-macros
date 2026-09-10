@@ -14,7 +14,7 @@ import {
   useColorModeValue,
   VStack
 } from '@chakra-ui/react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMacroContext } from '../../../contexts/macroContext'
 import useRecordingTrigger from '../../../hooks/useRecordingTrigger'
 import { HIDLookup } from '../../../constants/HIDmap'
@@ -42,6 +42,23 @@ export default function TriggerModal({ isOpen, onClose }: Props) {
   }, [items])
   const [isAllowed, setIsAllowed] = useState(false) // Currently not used
   const secondBg = useColorModeValue('blue.50', 'gray.800')
+
+  // A new macro has no trigger yet: start recording as soon as the modal opens, so the user
+  // can press the trigger straight away instead of clicking Record first.
+  useEffect(() => {
+    if (isOpen && items.length === 0 && !recording) {
+      startRecording()
+    }
+    // Only react to the modal opening, not to every keystroke while it is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  // Closing the modal any other way (Escape, clicking outside) must also stop recording.
+  useEffect(() => {
+    if (!isOpen && recording) {
+      stopRecording()
+    }
+  }, [isOpen, recording, stopRecording])
 
   const getTriggerCanSave = useMemo((): boolean => {
     if (items.length === 0) {
