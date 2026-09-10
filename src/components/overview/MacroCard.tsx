@@ -184,19 +184,19 @@ export default function MacroCard({
           placement="bottom"
           hasArrow
           label={
-            currentCollection.active
-              ? macro.active
-                ? 'Disable Macro'
-                : 'Enable Macro'
-              : 'Re-enable Collection!'
+            (macro.active ? 'Disable Macro' : 'Enable Macro') +
+            (currentCollection.active
+              ? ''
+              : (currentCollection.linked_processes ?? []).length > 0
+                ? ' (the collection arms when a linked application is focused)'
+                : ' (the collection is currently off)')
           }
         >
           <Box>
             <Switch
               variant="brand"
               defaultChecked={macro.active}
-              isChecked={currentCollection.active ? macro.active : false}
-              isDisabled={!currentCollection.active}
+              isChecked={macro.active}
               aria-label="Macro Toggle"
               onChange={onToggle}
             />
