@@ -290,13 +290,13 @@ export default function LinkedAppsModal({ isOpen, onClose }: Props) {
             <Text fontSize="sm" fontWeight="semibold">
               App not listed?
             </Text>
+            <Button size="sm" alignSelf="flex-start" onClick={browseForExe}>
+              Browse for an .exe…
+            </Button>
             <HStack>
-              <Button size="sm" onClick={browseForExe}>
-                Browse for an .exe…
-              </Button>
               <Input
                 size="sm"
-                placeholder="or type its executable name, e.g. game.exe"
+                placeholder="Or type its executable name, e.g. game.exe"
                 value={manualName}
                 onChange={(event) => setManualName(event.target.value)}
                 onKeyDown={(event) => {
@@ -308,6 +308,7 @@ export default function LinkedAppsModal({ isOpen, onClose }: Props) {
               />
               <Button
                 size="sm"
+                flexShrink={0}
                 onClick={() => {
                   toggleExe(manualName)
                   setManualName('')

@@ -70,51 +70,52 @@ export default function CollectionButton({
         >
           {collection.name}
         </Text>
-        {isLinked && (
+        {isLinked ? (
+          // Focus controls a linked collection, so its state replaces the switch.
           <Tooltip
             variant="brand"
             placement="bottom"
             hasArrow
-            label={`Armed while ${(collection.linked_processes ?? []).join(
-              ', '
-            )} is focused`}
+            label={`Controlled by the linked applications: armed while ${(
+              collection.linked_processes ?? []
+            ).join(', ')} is focused`}
           >
             <Badge
               zIndex={10}
               fontSize="2xs"
+              flexShrink={0}
               colorScheme={collection.active ? 'green' : 'gray'}
             >
-              {collection.active ? 'Armed' : 'Disarmed'}
+              {collection.active ? 'Armed' : 'Off'}
             </Badge>
           </Tooltip>
-        )}
-        <Tooltip
-          variant="brand"
-          placement="bottom"
-          hasArrow
-          label={
-            !isMacroOutputEnabled
-              ? 'Re-enable Macro Output!'
-              : isLinked
-                ? 'Controlled by the linked applications'
+        ) : (
+          <Tooltip
+            variant="brand"
+            placement="bottom"
+            hasArrow
+            label={
+              !isMacroOutputEnabled
+                ? 'Re-enable Macro Output!'
                 : collection.active
                   ? 'Disable Collection'
                   : 'Enable Collection'
-          }
-        >
-          <Box>
-            <Switch
-              size="sm"
-              variant="brand"
-              zIndex={10}
-              defaultChecked={collection.active}
-              isChecked={isMacroOutputEnabled ? collection.active : false}
-              isDisabled={!isMacroOutputEnabled || isLinked}
-              onChange={() => toggleCollection(index)}
-              aria-label="Collection Toggle"
-            />
-          </Box>
-        </Tooltip>
+            }
+          >
+            <Box>
+              <Switch
+                size="sm"
+                variant="brand"
+                zIndex={10}
+                defaultChecked={collection.active}
+                isChecked={isMacroOutputEnabled ? collection.active : false}
+                isDisabled={!isMacroOutputEnabled}
+                onChange={() => toggleCollection(index)}
+                aria-label="Collection Toggle"
+              />
+            </Box>
+          </Tooltip>
+        )}
       </HStack>
     </Box>
   )
