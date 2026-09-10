@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   HStack,
   Switch,
@@ -30,6 +31,7 @@ export default function CollectionButton({
     'primary-accent.700',
     'primary-accent.200'
   )
+  const isLinked = (collection.linked_processes ?? []).length > 0
 
   return (
     <Box
@@ -68,16 +70,36 @@ export default function CollectionButton({
         >
           {collection.name}
         </Text>
+        {isLinked && (
+          <Tooltip
+            variant="brand"
+            placement="bottom"
+            hasArrow
+            label={`Armed while ${(collection.linked_processes ?? []).join(
+              ', '
+            )} is focused`}
+          >
+            <Badge
+              zIndex={10}
+              fontSize="2xs"
+              colorScheme={collection.active ? 'green' : 'gray'}
+            >
+              {collection.active ? 'Armed' : 'Disarmed'}
+            </Badge>
+          </Tooltip>
+        )}
         <Tooltip
           variant="brand"
           placement="bottom"
           hasArrow
           label={
-            isMacroOutputEnabled
-              ? collection.active
-                ? 'Disable Collection'
-                : 'Enable Collection'
-              : 'Re-enable Macro Output!'
+            !isMacroOutputEnabled
+              ? 'Re-enable Macro Output!'
+              : isLinked
+                ? 'Controlled by the linked applications'
+                : collection.active
+                  ? 'Disable Collection'
+                  : 'Enable Collection'
           }
         >
           <Box>
@@ -87,7 +109,7 @@ export default function CollectionButton({
               zIndex={10}
               defaultChecked={collection.active}
               isChecked={isMacroOutputEnabled ? collection.active : false}
-              isDisabled={!isMacroOutputEnabled}
+              isDisabled={!isMacroOutputEnabled || isLinked}
               onChange={() => toggleCollection(index)}
               aria-label="Collection Toggle"
             />

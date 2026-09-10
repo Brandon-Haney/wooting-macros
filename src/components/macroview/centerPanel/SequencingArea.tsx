@@ -143,15 +143,16 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         >
           {willCauseTriggerLooping && (
             <Alert
-              status="error"
+              status="info"
               w={['full', 'fit']}
               rounded="md"
               py="1"
               px={['2', '3']}
             >
               <AlertIcon boxSize={['16px', '20px']} />
-              <AlertDescription fontSize={['xs', 'sm']} fontWeight="bold">
-                1+ elements may trigger this macro again or another macro!
+              <AlertDescription fontSize={['xs', 'sm']}>
+                The sequence contains a trigger key. The macro&apos;s own output
+                never re-triggers it, but it can trigger other macros.
               </AlertDescription>
             </Alert>
           )}

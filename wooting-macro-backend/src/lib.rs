@@ -1,6 +1,6 @@
 #[cfg(not(debug_assertions))]
 use std::path::PathBuf;
-use std::collections::HashMap as StdHashMap;
+use std::collections::{HashMap as StdHashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::{thread, time};
@@ -34,6 +34,7 @@ use crate::plugin::phillips_hue;
 use crate::plugin::system_event;
 
 pub mod config;
+pub mod foreground;
 mod hid_table;
 pub mod plugin;
 
@@ -95,6 +96,25 @@ pub enum TriggerEventType {
     //IDEA: computer temperature?
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+/// What happens to a quick tap of the trigger of an `OnHold` macro with a hold threshold.
+pub enum TapMode {
+    /// The press is held back until it is known to be a tap, then replayed as one synthetic tap.
+    /// The OS never sees the trigger key held down; a tap arrives on release instead of on press.
+    #[default]
+    DeferredTap,
+    /// The press reaches the OS immediately. Zero tap latency, but the OS sees the trigger key
+    /// held for the threshold duration before the loop starts.
+    PassThrough,
+}
+
+/// Default `Macro::hold_threshold_ms`.
+pub const DEFAULT_HOLD_THRESHOLD_MS: u64 = 250;
+
+fn default_hold_threshold_ms() -> u64 {
+    DEFAULT_HOLD_THRESHOLD_MS
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// This is a macro struct. Includes all information a macro needs to run.
 pub struct Macro {
@@ -104,6 +124,13 @@ pub struct Macro {
     pub macro_type: MacroType,
     pub trigger: TriggerEventType,
     pub active: bool,
+    /// `OnHold` only: how long the trigger has to be held before the loop starts. Shorter presses
+    /// are taps, see `tap_mode`. 0 starts the loop on press (taps are swallowed).
+    #[serde(default = "default_hold_threshold_ms")]
+    pub hold_threshold_ms: u64,
+    /// `OnHold` only, see `TapMode`.
+    #[serde(default)]
+    pub tap_mode: TapMode,
 }
 
 impl Macro {
@@ -238,13 +265,59 @@ pub struct LoopHandle {
     running: Arc<AtomicBool>,
     /// Whether releasing any key of the trigger stops the loop (`OnHold`) or not (`Toggle`).
     stop_on_release: bool,
+    /// Whether the release of `main_key` must be swallowed because the OS never saw its press
+    /// (`OnHold` with `TapMode::DeferredTap`).
+    swallow_release: bool,
+    /// The trigger's main key, i.e. the last one of the combination.
+    main_key: u32,
 }
 
-/// Macros currently looping (`OnHold` or `Toggle`), keyed by trigger identity.
+/// An `OnHold` trigger that was pressed and is waiting to turn out a tap or a hold.
+#[derive(Debug, Clone)]
+pub struct PendingHold {
+    pressed_at: time::Instant,
+    threshold: time::Duration,
+    tap_mode: TapMode,
+    /// Cleared when the press is resolved before the timer fires. Also identifies the timer.
+    armed: Arc<AtomicBool>,
+    main_key: u32,
+    macros: Macro,
+}
+
+/// State of a trigger that has a looping macro in flight.
+#[derive(Debug, Clone)]
+pub enum TriggerState {
+    Pending(PendingHold),
+    Running(LoopHandle),
+}
+
+impl TriggerState {
+    fn stop(&self) {
+        match self {
+            TriggerState::Pending(pending) => pending.armed.store(false, Ordering::Relaxed),
+            TriggerState::Running(handle) => handle.running.store(false, Ordering::Relaxed),
+        }
+    }
+}
+
+type Registry = StdHashMap<TriggerKey, TriggerState>;
+
+/// Macros currently pending or looping (`OnHold` or `Toggle`), keyed by trigger identity.
 ///
 /// This is a plain mutex rather than the async `RwLock`: it is touched from the grab thread, from
 /// async tasks and from synchronous Tauri commands, and it is never held across an await.
-pub type RunningMacros = Arc<Mutex<StdHashMap<TriggerKey, LoopHandle>>>;
+pub type RunningMacros = Arc<Mutex<Registry>>;
+
+/// Duration of the synthetic tap replayed when a deferred press turns out to be a tap.
+const TAP_REPLAY_DURATION: time::Duration = time::Duration::from_millis(30);
+
+/// The key of a trigger whose release resolves a tap or a hold: the last key of a combination.
+fn main_key_of(trigger: &TriggerEventType) -> u32 {
+    match trigger {
+        TriggerEventType::KeyPressEvent { data, .. } => data.last().copied().unwrap_or_default(),
+        TriggerEventType::MouseEvent { data } => data.into(),
+    }
+}
 
 /// Events the executor is about to inject into the OS (see `keypress_executor_sender`).
 ///
@@ -287,6 +360,8 @@ pub struct MacroBackend {
     pub triggers: Arc<RwLock<MacroTriggerLookup>>,
     pub is_listening: Arc<AtomicBool>,
     pub running: RunningMacros,
+    /// Executable name of the application owning the foreground window, as last reported.
+    foreground: Arc<Mutex<Option<String>>>,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -303,6 +378,7 @@ impl Default for MacroData {
                 icon: ":smile:".to_string(),
                 macros: vec![],
                 active: true,
+                linked_processes: vec![],
             }],
         }
     }
@@ -370,6 +446,48 @@ pub struct Collection {
     pub icon: String,
     pub macros: Vec<Macro>,
     pub active: bool,
+    /// Executable names (`game.exe`, case-insensitive). When not empty the collection is armed
+    /// only while one of them owns the foreground window and `active` is managed automatically.
+    #[serde(default)]
+    pub linked_processes: Vec<String>,
+}
+
+impl Collection {
+    /// Whether this collection's `active` flag is driven by the foreground application.
+    pub fn is_linked(&self) -> bool {
+        !self.linked_processes.is_empty()
+    }
+
+    fn is_linked_to(&self, process: &str) -> bool {
+        self.linked_processes
+            .iter()
+            .any(|linked| linked.trim().eq_ignore_ascii_case(process))
+    }
+}
+
+impl MacroData {
+    /// Arms every linked collection whose application is in the foreground and disarms the other
+    /// linked ones. Returns true if any collection changed state.
+    pub fn apply_foreground_process(&mut self, process: Option<&str>) -> bool {
+        let mut changed = false;
+        for collection in &mut self.data {
+            if !collection.is_linked() {
+                continue;
+            }
+            let should_be_active = process.is_some_and(|process| collection.is_linked_to(process));
+            if collection.active != should_be_active {
+                info!(
+                    "Collection {:?} {} (foreground: {:?})",
+                    collection.name,
+                    if should_be_active { "armed" } else { "disarmed" },
+                    process
+                );
+                collection.active = should_be_active;
+                changed = true;
+            }
+        }
+        changed
+    }
 }
 
 /// Executes a given macro (according to its type).
@@ -395,9 +513,9 @@ fn execute_macro(macros: Macro, context: &ExecutionContext) {
             let flag = {
                 let mut running = lock_or_recover(&context.running);
 
-                if let Some(handle) = running.remove(&trigger) {
+                if let Some(state) = running.remove(&trigger) {
                     info!("\nSTOPPING A TOGGLE MACRO: {:#?}", macros.name);
-                    handle.running.store(false, Ordering::Relaxed);
+                    state.stop();
                     return;
                 }
 
@@ -405,10 +523,12 @@ fn execute_macro(macros: Macro, context: &ExecutionContext) {
                 let flag = Arc::new(AtomicBool::new(true));
                 running.insert(
                     trigger.clone(),
-                    LoopHandle {
+                    TriggerState::Running(LoopHandle {
                         running: flag.clone(),
                         stop_on_release: false,
-                    },
+                        swallow_release: false,
+                        main_key: main_key_of(&macros.trigger),
+                    }),
                 );
                 flag
             };
@@ -417,34 +537,164 @@ fn execute_macro(macros: Macro, context: &ExecutionContext) {
         }
         MacroType::OnHold => {
             let trigger = TriggerKey::from(&macros.trigger);
+            let mut running = lock_or_recover(&context.running);
 
-            let flag = {
-                let mut running = lock_or_recover(&context.running);
-
-                // The OS auto-repeats a held trigger key, which re-matches the macro: ignore it.
-                if running.contains_key(&trigger) {
-                    trace!(
-                        "on-hold macro {:?} is already running, ignoring re-trigger",
-                        macros.name
-                    );
-                    return;
-                }
-
-                info!("\nSTARTING AN ON-HOLD MACRO: {:#?}", macros.name);
-                let flag = Arc::new(AtomicBool::new(true));
-                running.insert(
-                    trigger.clone(),
-                    LoopHandle {
-                        running: flag.clone(),
-                        stop_on_release: true,
-                    },
+            // The OS auto-repeats a held trigger key, which re-matches the macro: ignore it.
+            if running.contains_key(&trigger) {
+                trace!(
+                    "on-hold macro {:?} is already pending or running, ignoring re-trigger",
+                    macros.name
                 );
-                flag
-            };
+                return;
+            }
 
-            spawn_macro_loop(macros, trigger, flag, context);
+            if macros.hold_threshold_ms == 0 {
+                info!("\nSTARTING AN ON-HOLD MACRO: {:#?}", macros.name);
+                start_on_hold_loop(&mut running, macros, trigger, false, context);
+                return;
+            }
+
+            debug!(
+                "Waiting {} ms to see whether {:?} is tapped or held",
+                macros.hold_threshold_ms, macros.name
+            );
+            let armed = Arc::new(AtomicBool::new(true));
+            let threshold = time::Duration::from_millis(macros.hold_threshold_ms);
+            running.insert(
+                trigger.clone(),
+                TriggerState::Pending(PendingHold {
+                    pressed_at: time::Instant::now(),
+                    threshold,
+                    tap_mode: macros.tap_mode,
+                    armed: armed.clone(),
+                    main_key: main_key_of(&macros.trigger),
+                    macros,
+                }),
+            );
+            spawn_hold_timer(trigger, armed, threshold, context);
         }
     }
+}
+
+/// Lifts the modifiers of a multi-key trigger so the sequence is not typed with them held.
+fn lift_trigger_modifiers(macros: &Macro, context: &ExecutionContext) {
+    if let TriggerEventType::KeyPressEvent { data, .. } = &macros.trigger {
+        // A single key can't be a modifier, so there is nothing to lift for those.
+        if data.len() > 1 {
+            // This releases any trigger keys that have been held to make macros more reliable when used with modifier hotkeys.
+            plugin::util::lift_keys(data, &context.channel)
+                .unwrap_or_else(|err| error!("Error lifting keys: {}", err));
+        }
+    }
+}
+
+/// Registers an on-hold macro as running and starts its loop. Takes the locked registry so the
+/// transition is atomic with respect to the release that will stop it.
+fn start_on_hold_loop(
+    running: &mut Registry,
+    macros: Macro,
+    trigger: TriggerKey,
+    swallow_release: bool,
+    context: &ExecutionContext,
+) {
+    lift_trigger_modifiers(&macros, context);
+
+    let flag = Arc::new(AtomicBool::new(true));
+    running.insert(
+        trigger.clone(),
+        TriggerState::Running(LoopHandle {
+            running: flag.clone(),
+            stop_on_release: true,
+            swallow_release,
+            main_key: main_key_of(&macros.trigger),
+        }),
+    );
+    spawn_macro_loop(macros, trigger, flag, context);
+}
+
+/// Starts the loop of a pending on-hold macro once the hold threshold has elapsed, unless the
+/// press was resolved (released, or discarded) in the meantime.
+fn spawn_hold_timer(
+    trigger: TriggerKey,
+    armed: Arc<AtomicBool>,
+    threshold: time::Duration,
+    context: &ExecutionContext,
+) {
+    let context = context.clone();
+
+    task::spawn(async move {
+        tokio::time::sleep(threshold).await;
+
+        let mut running = lock_or_recover(&context.running);
+
+        let is_still_ours = matches!(
+            running.get(&trigger),
+            Some(TriggerState::Pending(pending))
+                if Arc::ptr_eq(&pending.armed, &armed) && armed.load(Ordering::Relaxed)
+        );
+        if !is_still_ours {
+            return;
+        }
+
+        let Some(TriggerState::Pending(pending)) = running.remove(&trigger) else {
+            return;
+        };
+
+        info!(
+            "\nSTARTING AN ON-HOLD MACRO after a {} ms hold: {:#?}",
+            pending.threshold.as_millis(),
+            pending.macros.name
+        );
+        let swallow_release = pending.tap_mode == TapMode::DeferredTap;
+        start_on_hold_loop(&mut running, pending.macros, trigger, swallow_release, &context);
+    });
+}
+
+/// Plays the sequence once (a hold that ended before its loop could start).
+fn run_once(macros: Macro, context: &ExecutionContext) {
+    lift_trigger_modifiers(&macros, context);
+
+    let channel = context.channel.clone();
+    task::spawn(async move {
+        if let Err(error) = macros.execute(channel).await {
+            error!("error executing macro: {}", error);
+        }
+    });
+}
+
+/// Replays a deferred trigger press as one synthetic tap, so a tap still reaches the OS.
+fn replay_tap(main_key: u32, context: &ExecutionContext) {
+    let (press, release) = if let Some(key) = SCANCODE_TO_RDEV.get(&main_key) {
+        (rdev::EventType::KeyPress(*key), rdev::EventType::KeyRelease(*key))
+    } else if let Some(button) = BUTTON_TO_HID
+        .iter()
+        .find(|(_, hid)| **hid == main_key)
+        .map(|(button, _)| *button)
+    {
+        // The left button is never grabbed (see the grab hook), so its press already went through.
+        if button == rdev::Button::Left {
+            return;
+        }
+        (
+            rdev::EventType::ButtonPress(button),
+            rdev::EventType::ButtonRelease(button),
+        )
+    } else {
+        warn!("Can't replay a tap of unknown trigger key {:#x}", main_key);
+        return;
+    };
+
+    let channel = context.channel.clone();
+    task::spawn(async move {
+        if channel.send(press).is_err() {
+            error!("error replaying a tap: executor channel closed");
+            return;
+        }
+        tokio::time::sleep(TAP_REPLAY_DURATION).await;
+        if channel.send(release).is_err() {
+            error!("error replaying a tap: executor channel closed");
+        }
+    });
 }
 
 /// Spawns a task that repeats the macro until `flag` is cleared or the backend stops listening,
@@ -508,34 +758,83 @@ fn spawn_macro_loop(
         );
 
         let mut running = lock_or_recover(&running);
-        let is_own_entry = running
-            .get(&trigger)
-            .is_some_and(|handle| Arc::ptr_eq(&handle.running, &flag));
+        let is_own_entry = matches!(
+            running.get(&trigger),
+            Some(TriggerState::Running(handle)) if Arc::ptr_eq(&handle.running, &flag)
+        );
         if is_own_entry {
             running.remove(&trigger);
         }
     });
 }
 
-/// Stops every running `OnHold` macro whose trigger includes the released key.
+/// Handles the release of a key or button for every trigger that contains it: a pending on-hold
+/// press resolves to a tap or a hold, a running on-hold loop stops.
+///
+/// Returns true if the release must be swallowed because the OS never saw the matching press.
 ///
 /// Runs on the grab thread for every key and button release system-wide, so it has to stay cheap.
-fn stop_on_hold_macros(context: &ExecutionContext, released_hid: u32) {
+fn on_trigger_release(context: &ExecutionContext, released_hid: u32) -> bool {
+    let mut swallow = false;
     let mut running = lock_or_recover(&context.running);
-    running.retain(|trigger, handle| {
-        let stop = handle.stop_on_release && trigger.contains(released_hid);
-        if stop {
-            debug!(
-                "Stopping on-hold macro {:?} on release of {:#x}",
-                trigger, released_hid
-            );
-            handle.running.store(false, Ordering::Relaxed);
+
+    let affected: Vec<TriggerKey> = running
+        .keys()
+        .filter(|trigger| trigger.contains(released_hid))
+        .cloned()
+        .collect();
+
+    for trigger in affected {
+        match running.remove(&trigger) {
+            Some(TriggerState::Pending(pending)) => {
+                pending.armed.store(false, Ordering::Relaxed);
+                let held_for = pending.pressed_at.elapsed();
+
+                if held_for >= pending.threshold {
+                    // Held past the threshold, released before the timer got to run: still a
+                    // hold, so play the sequence once.
+                    debug!(
+                        "{:?} held {} ms, playing once",
+                        pending.macros.name,
+                        held_for.as_millis()
+                    );
+                    run_once(pending.macros, context);
+                } else if pending.tap_mode == TapMode::DeferredTap {
+                    debug!(
+                        "{:?} released after {} ms, replaying the tap",
+                        pending.macros.name,
+                        held_for.as_millis()
+                    );
+                    replay_tap(pending.main_key, context);
+                }
+
+                if pending.tap_mode == TapMode::DeferredTap && released_hid == pending.main_key {
+                    swallow = true;
+                }
+            }
+            Some(TriggerState::Running(handle)) => {
+                if handle.stop_on_release {
+                    debug!(
+                        "Stopping on-hold macro {:?} on release of {:#x}",
+                        trigger, released_hid
+                    );
+                    handle.running.store(false, Ordering::Relaxed);
+                    if handle.swallow_release && released_hid == handle.main_key {
+                        swallow = true;
+                    }
+                } else {
+                    // A toggle keeps looping through releases.
+                    running.insert(trigger, TriggerState::Running(handle));
+                }
+            }
+            None => {}
         }
-        !stop
-    });
+    }
+
+    swallow
 }
 
-/// Returns true if a currently looping macro is triggered by the given key.
+/// Returns true if a pending or looping macro is triggered by the given key.
 fn is_looping_trigger(context: &ExecutionContext, hid: u32) -> bool {
     lock_or_recover(&context.running)
         .keys()
@@ -630,7 +929,12 @@ fn check_macro_execution_efficiently(
         }
 
         debug!("MATCHED MACRO {:?}: {:#?}", macros.macro_type, pressed_events);
-        output = true;
+
+        // A gated on-hold macro in pass-through mode lets the physical press reach the OS.
+        let passes_press = macros.macro_type == MacroType::OnHold
+            && macros.hold_threshold_ms > 0
+            && macros.tap_mode == TapMode::PassThrough;
+        output |= !passes_press;
 
         // Looping macro types act on the first press only: the OS auto-repeat of a held trigger
         // must neither restart an on-hold loop nor flip a toggle. The repeat is still grabbed.
@@ -639,13 +943,9 @@ fn check_macro_execution_efficiently(
             continue;
         }
 
-        if let TriggerEventType::KeyPressEvent { data, .. } = &macros.trigger {
-            // A single key can't be a modifier, so there is nothing to lift for those.
-            if data.len() > 1 {
-                // This releases any trigger keys that have been held to make macros more reliable when used with modifier hotkeys.
-                plugin::util::lift_keys(data, &context.channel)
-                    .unwrap_or_else(|err| error!("Error lifting keys: {}", err));
-            }
+        // On-hold macros lift their modifiers once the hold is confirmed, see start_on_hold_loop.
+        if macros.macro_type != MacroType::OnHold {
+            lift_trigger_modifiers(macros, context);
         }
 
         execute_macro(macros.clone(), context);
@@ -684,24 +984,73 @@ impl MacroBackend {
         }
     }
 
-    /// Stops every looping (`OnHold` / `Toggle`) macro after its current iteration.
+    /// Stops every pending or looping (`OnHold` / `Toggle`) macro after its current iteration.
     pub fn stop_all_loops(&self) {
         let mut running = lock_or_recover(&self.running);
-        for handle in running.values() {
-            handle.running.store(false, Ordering::Relaxed);
+        for state in running.values() {
+            state.stop();
         }
         running.clear();
     }
 
+    /// Stops the pending or looping macros whose trigger is no longer that of an active looping
+    /// macro in the given lookup: they were edited, deactivated, deleted or their collection was
+    /// disarmed.
+    fn stop_loops_not_in(&self, triggers: &MacroTriggerLookup) {
+        let looping: HashSet<TriggerKey> = triggers
+            .values()
+            .flatten()
+            .filter(|macros| macros.macro_type != MacroType::Single)
+            .map(|macros| TriggerKey::from(&macros.trigger))
+            .collect();
+
+        let mut running = lock_or_recover(&self.running);
+        running.retain(|trigger, state| {
+            let keep = looping.contains(trigger);
+            if !keep {
+                debug!("Stopping loop of trigger {:?}: no longer active", trigger);
+                state.stop();
+            }
+            keep
+        });
+    }
+
     /// Sets the macros from the frontend to the files. This function is here to completely split the frontend off.
-    pub async fn set_macros(&self, macros: MacroData) -> Result<()> {
+    ///
+    /// Linked collections are armed or disarmed for the current foreground application first.
+    /// Returns the data if that changed it, so the frontend can be told.
+    pub async fn set_macros(&self, mut macros: MacroData) -> Result<Option<MacroData>> {
+        let foreground = lock_or_recover(&self.foreground).clone();
+        let adjusted = macros.apply_foreground_process(foreground.as_deref());
+
         macros.write_to_file()?;
+        let triggers = macros.extract_triggers()?;
         // The macros just changed under any loop that is running: a looping macro may have been
         // edited, deactivated or deleted.
-        self.stop_all_loops();
-        *self.triggers.write().await = macros.extract_triggers()?;
-        *self.data.write().await = macros;
-        Ok(())
+        self.stop_loops_not_in(&triggers);
+        *self.triggers.write().await = triggers;
+        *self.data.write().await = macros.clone();
+
+        Ok(adjusted.then_some(macros))
+    }
+
+    /// Reports which application owns the foreground window (`None` if unknown) and arms or
+    /// disarms the collections linked to applications accordingly.
+    ///
+    /// Returns the data if any collection changed state, so the frontend can be told.
+    pub async fn set_foreground_process(&self, process: Option<String>) -> Result<Option<MacroData>> {
+        *lock_or_recover(&self.foreground) = process.clone();
+
+        let mut data = self.data.write().await;
+        if !data.apply_foreground_process(process.as_deref()) {
+            return Ok(None);
+        }
+
+        let triggers = data.extract_triggers()?;
+        self.stop_loops_not_in(&triggers);
+        *self.triggers.write().await = triggers;
+
+        Ok(Some(data.clone()))
     }
 
     /// Sets the config from the frontend to the files. This function is here to completely split the frontend off.
@@ -717,6 +1066,8 @@ impl MacroBackend {
         //TODO: implement drop when the application ends to clean up the downed keys
 
         //==================================================
+
+        foreground::request_fine_timer_resolution();
 
         let inner_triggers = self.triggers.clone();
 
@@ -743,7 +1094,14 @@ impl MacroBackend {
             rdev::grab(move |event: rdev::Event| {
                 context.hook_events.fetch_add(1, Ordering::Relaxed);
 
-                // Our own output: let it through untouched, it is neither a trigger nor a release.
+                // Our own output (stamped by the rdev fork): let it through untouched, it is
+                // neither a trigger nor a release.
+                if event.injected {
+                    trace!("Passing through injected event {:?}", event.event_type);
+                    return Some(event);
+                }
+
+                // Same, for platforms where rdev can't stamp its output.
                 {
                     let mut injected = lock_or_recover(&context.injected);
                     if let Some(position) = injected.iter().position(|e| *e == event.event_type) {
@@ -845,7 +1203,9 @@ impl MacroBackend {
                             debug!("Key state: {:?}", keys_pressed.0.blocking_read());
 
                             if let Some(hid) = SCANCODE_TO_HID.get(&key) {
-                                stop_on_hold_macros(&context, *hid);
+                                if on_trigger_release(&context, *hid) {
+                                    return None;
+                                }
                             }
 
                             Some(event)
@@ -885,7 +1245,9 @@ impl MacroBackend {
                             debug!("Button released: {:?}", button);
 
                             if let Some(hid) = BUTTON_TO_HID.get(&button) {
-                                stop_on_hold_macros(&context, *hid);
+                                if on_trigger_release(&context, *hid) {
+                                    return None;
+                                }
                             }
 
                             Some(event)
@@ -919,6 +1281,7 @@ impl Default for MacroBackend {
             triggers: Arc::new(RwLock::from(triggers)),
             is_listening: Arc::new(AtomicBool::new(true)),
             running: RunningMacros::default(),
+            foreground: Arc::new(Mutex::new(None)),
         }
     }
 }

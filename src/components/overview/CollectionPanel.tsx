@@ -1,4 +1,4 @@
-import { DeleteIcon } from '@chakra-ui/icons'
+import { DeleteIcon, LinkIcon } from '@chakra-ui/icons'
 import {
   Box,
   Button,
@@ -13,6 +13,7 @@ import {
 import { useApplicationContext } from '../../contexts/applicationContext'
 import { useSelectedCollection } from '../../contexts/selectors'
 import DeleteCollectionModal from './DeleteCollectionModal'
+import LinkedAppsModal from './LinkedAppsModal'
 import MacroList from './MacroList'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import EmojiPopover from '../EmojiPopover'
@@ -41,6 +42,12 @@ export default function CollectionPanel({ searchValue }: Props) {
     onOpen: onEmojiPopoverOpen,
     onClose: onEmojiPopoverClose
   } = useDisclosure()
+  const {
+    isOpen: isLinkedAppsModalOpen,
+    onOpen: onLinkedAppsModalOpen,
+    onClose: onLinkedAppsModalClose
+  } = useDisclosure()
+  const linkedCount = (currentCollection.linked_processes ?? []).length
   const [collectionName, setCollectionName] = useState('')
   const borderColour = useBorderColour()
   const isCollectionUndeletable = collections.length <= 1
@@ -140,6 +147,23 @@ export default function CollectionPanel({ searchValue }: Props) {
             </Button> */}
               <Tooltip
                 variant="brand"
+                label="Arm this collection only while linked applications are focused"
+                hasArrow
+                placement="bottom-start"
+              >
+                <Button
+                  leftIcon={<LinkIcon />}
+                  size="md"
+                  onClick={onLinkedAppsModalOpen}
+                  aria-label="Linked Applications"
+                >
+                  {linkedCount === 0
+                    ? 'Link Applications'
+                    : `Linked Apps (${linkedCount})`}
+                </Button>
+              </Tooltip>
+              <Tooltip
+                variant="brand"
                 label={
                   isCollectionUndeletable
                     ? "Can't delete your last collection!"
@@ -178,6 +202,10 @@ export default function CollectionPanel({ searchValue }: Props) {
       <DeleteCollectionModal
         isOpen={isDeleteModalOpen}
         onClose={onDeleteModalClose}
+      />
+      <LinkedAppsModal
+        isOpen={isLinkedAppsModalOpen}
+        onClose={onLinkedAppsModalClose}
       />
       <MacroList searchValue={searchValue} />
     </VStack>

@@ -28,6 +28,10 @@ export const updateMacroOutput = (value: boolean): Promise<void> => {
     frontendBool: !value
   })
 }
+export const listProcesses = (): Promise<string[]> => {
+  return invoke<string[]>('list_processes', {})
+}
+
 export const isDebug = (): Promise<boolean> => {
   return invoke<boolean>('is_debug', {})
 }

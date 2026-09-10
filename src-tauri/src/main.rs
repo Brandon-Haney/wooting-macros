@@ -50,16 +50,65 @@ async fn get_macros(state: tauri::State<'_, MacroBackend>) -> Result<MacroData, 
     Ok(state.data.read().await.clone())
 }
 
+/// Event carrying the whole macro data whenever the backend changed it on its own (a linked
+/// collection was armed or disarmed).
+const MACRO_DATA_UPDATED_EVENT: &str = "macro-data-updated";
+
 #[tauri::command]
 /// Sets the configuration from frontend and updates the state for everything on backend.
 async fn set_macros(
+    app: tauri::AppHandle,
     state: tauri::State<'_, MacroBackend>,
     frontend_data: MacroData,
 ) -> Result<(), String> {
-    state
+    let adjusted = state
         .set_macros(frontend_data)
         .await
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+
+    if let Some(data) = adjusted {
+        app.emit_all(MACRO_DATA_UPDATED_EVENT, data)
+            .map_err(|err| err.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+/// Executable names of the running processes, for linking collections to applications.
+async fn list_processes() -> Result<Vec<String>, ()> {
+    Ok(foreground::running_process_names())
+}
+
+/// Interval at which the foreground application is checked.
+const FOREGROUND_POLL_INTERVAL: time::Duration = time::Duration::from_millis(250);
+
+/// Watches the foreground window and arms or disarms the collections linked to applications.
+fn spawn_foreground_watcher(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut last: Option<Option<String>> = None;
+
+        loop {
+            let current = foreground::foreground_process_name();
+
+            if last.as_ref() != Some(&current) {
+                trace!("Foreground application: {:?}", current);
+                last = Some(current.clone());
+
+                let backend = app.state::<MacroBackend>();
+                match backend.set_foreground_process(current).await {
+                    Ok(Some(data)) => {
+                        if let Err(err) = app.emit_all(MACRO_DATA_UPDATED_EVENT, data) {
+                            error!("error notifying the frontend of armed collections: {}", err);
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(err) => error!("error arming linked collections: {}", err),
+                }
+            }
+
+            tokio::time::sleep(FOREGROUND_POLL_INTERVAL).await;
+        }
+    });
 }
 
 #[tauri::command]
@@ -160,13 +209,16 @@ async fn main() -> Result<(), Error> {
             get_config,
             set_config,
             control_grabbing,
-            is_debug
+            is_debug,
+            list_processes
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;
             init_autostart(app_name, set_autolaunch).unwrap_or_else(|err| {
                 error!("error changing the autostart options: {}", err.to_string())
             });
+
+            spawn_foreground_watcher(app.handle());
 
             Ok(())
         })

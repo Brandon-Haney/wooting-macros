@@ -7,7 +7,11 @@ import {
   useMemo,
   useState
 } from 'react'
-import { MacroType, ViewState } from '../constants/enums'
+import {
+  DEFAULT_HOLD_THRESHOLD_MS,
+  MacroType,
+  ViewState
+} from '../constants/enums'
 import { checkIfElementIsEditable } from '../constants/utils'
 import {
   ActionEventType,
@@ -15,6 +19,7 @@ import {
   Macro,
   MacroState,
   MouseEventAction,
+  TapMode,
   TriggerEventType
 } from '../types'
 import { useApplicationContext } from './applicationContext'
@@ -41,7 +46,9 @@ const macroDefault: Macro = {
   active: true,
   macro_type: 'Single',
   trigger: { type: 'KeyPressEvent', data: [], allow_while_other_keys: false },
-  sequence: []
+  sequence: [],
+  hold_threshold_ms: DEFAULT_HOLD_THRESHOLD_MS,
+  tap_mode: 'DeferredTap'
 }
 
 function MacroProvider({ children }: MacroProviderProps) {
@@ -177,6 +184,20 @@ function MacroProvider({ children }: MacroProviderProps) {
   const updateMacroType = useCallback(
     (newType: MacroType) => {
       setMacro({ ...macro, macro_type: MacroType[newType] })
+    },
+    [macro, setMacro]
+  )
+
+  const updateHoldThreshold = useCallback(
+    (milliseconds: number) => {
+      setMacro({ ...macro, hold_threshold_ms: Math.max(0, Math.round(milliseconds)) })
+    },
+    [macro, setMacro]
+  )
+
+  const updateTapMode = useCallback(
+    (mode: TapMode) => {
+      setMacro({ ...macro, tap_mode: mode })
     },
     [macro, setMacro]
   )
@@ -355,6 +376,8 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroName,
       updateMacroIcon,
       updateMacroType,
+      updateHoldThreshold,
+      updateTapMode,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,
@@ -381,6 +404,8 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroName,
       updateMacroIcon,
       updateMacroType,
+      updateHoldThreshold,
+      updateTapMode,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,

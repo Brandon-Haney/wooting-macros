@@ -14,6 +14,7 @@ import { AppState, Collection, CurrentSelection, MacroData } from '../types'
 import { isDebug, updateBackendConfig } from '../constants/utils'
 import { error } from 'tauri-plugin-log'
 import { invoke } from '@tauri-apps/api'
+import { listen } from '@tauri-apps/api/event'
 
 interface ApplicationProviderProps {
   children: ReactNode
@@ -82,6 +83,16 @@ function ApplicationProvider({ children }: ApplicationProviderProps) {
         })
       })
   }, [toast])
+
+  // The backend arms and disarms collections linked to applications on its own.
+  useEffect(() => {
+    const unlisten = listen<MacroData>('macro-data-updated', (event) => {
+      setCollections(event.payload.data)
+    })
+    return () => {
+      unlisten.then((stop) => stop()).catch((e) => error(e))
+    }
+  }, [])
 
   useEffect(() => {
     if (initComplete)

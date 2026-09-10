@@ -8,7 +8,8 @@
 
 - **Create Macros:** Perform keystrokes, open applications, folders, and websites, paste text with emojis, and more.
 - **Organize your macros:** Group macros into specific collections, allowing you to toggle the entire collection on/off.
-- **Single, Toggle or On Hold:** Play a macro once per press, keep it repeating until the trigger is pressed again, or repeat it only while the trigger is held down.
+- **Single, Toggle or On Hold:** Play a macro once per press, keep it repeating until the trigger is pressed again, or repeat it only while the trigger is held down. On Hold macros have a hold threshold, so a quick tap of the trigger stays a normal key press and only a long press starts the stream. A macro may use the same key as trigger and output.
+- **Application-scoped collections:** Link a collection to one or more applications and it arms itself while one of them is the focused window, and disarms otherwise.
 - **Any Keyboard, Any Mouse:** You can bind the macros to be activated by any keyboard key or mouse button*.
 - **Open Source:** Want to help out? See below on how to get started.
 - **Windows & Linux:** Support for Windows 10/11 and most Linux distros**. MacOS support is on our radar.
@@ -16,6 +17,16 @@
 *Mice with more than 5 buttons may experience unintended behaviour. Please report any issues on the [Discord](https://discord.gg/wooting)!
 
 **Linux is supported, but may be unstable with Wayland. Different DEs and distributions may result in various bugs - please report them. Some input latency may be introduced on Linux due to the scheduler. You can increase the niceness of the process manually to eliminate it.
+
+## About this fork
+
+This is a community-maintained fork of [WootingKb/wooting-macros](https://github.com/WootingKb/wooting-macros), whose last release dates from February 2024. It adds the On Hold and Toggle macro types, the hold threshold, the self-trigger filter and application-scoped collections. Later phases are planned to triage the upstream backlog (more system actions, mouse movement recording, macro chaining, repeat counts) and to move to Tauri 2.
+
+Explicitly out of scope:
+
+- **On-board (firmware) macros.** Wootility and the keyboard firmware are closed source; no software project can store macros on the keyboard.
+- **Profile switching.** Wootility already switches keyboard profiles per application through its background service; this app does not duplicate it.
+- **Anti-cheat evasion.** The app injects input through a low-level hook, which anti-cheat software can detect. That risk is documented below and not engineered around.
 
 ## Warnings
 

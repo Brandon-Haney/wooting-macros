@@ -38,6 +38,8 @@ export type MacroState = {
   updateMacroName: (newName: string) => void
   updateMacroIcon: (newIcon: string) => void
   updateMacroType: (newType: MacroType) => void
+  updateHoldThreshold: (milliseconds: number) => void
+  updateTapMode: (mode: TapMode) => void
   updateTrigger: (newElement: TriggerEventType) => void
   updateAllowWhileOtherKeys: (value: boolean) => void
   onElementAdd: (newElement: ActionEventType) => void
@@ -107,6 +109,9 @@ export interface ApplicationConfig {
   MinimizeToTray: boolean
 }
 
+/** What a quick tap of an OnHold macro's trigger does, see the backend TapMode. */
+export type TapMode = 'DeferredTap' | 'PassThrough'
+
 export interface Macro {
   name: string
   icon: string
@@ -114,6 +119,10 @@ export interface Macro {
   macro_type: string
   trigger: TriggerEventType
   sequence: ActionEventType[]
+  /** OnHold only: hold duration in ms before the loop starts; 0 starts it on press. */
+  hold_threshold_ms?: number
+  /** OnHold only. */
+  tap_mode?: TapMode
 }
 
 export interface Collection {
@@ -121,6 +130,8 @@ export interface Collection {
   active: boolean
   macros: Macro[]
   icon: string
+  /** Executable names; when set, the collection is armed only while one is focused. */
+  linked_processes?: string[]
 }
 
 declare global {

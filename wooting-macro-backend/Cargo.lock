@@ -3605,7 +3605,7 @@ dependencies = [
 [[package]]
 name = "rdev"
 version = "0.6.3"
-source = "git+https://github.com/medzernik/rdev?branch=main#4cff1107d8f63936e1225e7a77a43bcbf61f6233"
+source = "git+https://github.com/Brandon-Haney/rdev?branch=injected-flag#4fdf60655ddd8d6a8e6b732845cfd431dfe33608"
 dependencies = [
  "cocoa 0.25.0",
  "core-foundation",
@@ -5915,6 +5915,7 @@ dependencies = [
  "tokio",
  "tokio-serde",
  "url",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

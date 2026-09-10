@@ -41,7 +41,8 @@ export default function LeftPanel({
       active: true,
       icon: `:😍:`,
       macros: [],
-      name: `Collection ${collections.length + 1}`
+      name: `Collection ${collections.length + 1}`,
+      linked_processes: []
     })
   }, [collections.length, onCollectionAdd])
 

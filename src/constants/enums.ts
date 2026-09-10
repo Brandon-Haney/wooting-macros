@@ -11,6 +11,9 @@ export enum MacroType {
   OnHold
 }
 
+/** Default hold threshold for OnHold macros, mirrors the backend default. */
+export const DEFAULT_HOLD_THRESHOLD_MS = 250
+
 /** Display names for each MacroType, in enum order. */
 export const MacroTypeNames: string[] = ['Single', 'Toggle', 'On Hold']
 
