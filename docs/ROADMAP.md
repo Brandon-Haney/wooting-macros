@@ -46,7 +46,7 @@ remaps, and reliable across a whole gaming session.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Bulk element edits (upstream #262) | done, unreleased | Edit All: set every delay, compact delays, remove delays, set every press duration. Multi-select still later |
-| Timeline macro editor with simulation (Wootility-style) | proposed | Per-key timeline view, recording into it, virtual simulation panel; plan in [TIMELINE_EDITOR_PLAN.md](TIMELINE_EDITOR_PLAN.md) |
+| Timeline macro editor with simulation (Wootility-style) | next | Per-key timeline view, recording into it, virtual simulation panel; plan in [TIMELINE_EDITOR_PLAN.md](TIMELINE_EDITOR_PLAN.md) |
 | Inline element editing on the sequence card | later | |
 | Recording with a single global delay / compact delays | done, unreleased | Settings: Record with fixed timings; Compact delays in Edit All |
 | Sound on macro activation (upstream #144) | later | rodio is already a dependency |
@@ -80,6 +80,7 @@ remaps, and reliable across a whole gaming session.
 | Per-macro application scope | Yes: "Only in these applications" per macro, layered on the collection link (2026-09-10) |
 | Version number and app name | Bump to 1.2.0, keep the Wootomation name for now (2026-09-10) |
 | Auto-update via GitHub Releases | Yes: CI builds installers on tag, in-app updater on our own signing key (2026-09-10) |
+| Timeline editor | Derived view over the linear sequence, List/Timeline toggle, frontend simulation first, recording appends, timed mouse presses will block the sequence like keys; full table in [TIMELINE_EDITOR_PLAN.md](TIMELINE_EDITOR_PLAN.md) (2026-09-10) |
 | Priority order of the "next" items | Editor shortcuts, status bar, tray menu, import/export, then per-macro scope and releases (2026-09-10) |
 
 ## Out of scope

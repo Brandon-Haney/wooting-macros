@@ -1,6 +1,6 @@
 # Timeline macro editor
 
-Plan for a Wootility-style macro editor: a per-key timeline of the sequence, live recording into that timeline, and a simulation panel that plays the macro virtually. Status: **proposal, under discussion** (2026-09-10). Decisions taken during the discussion go into the table at the end and into [ROADMAP.md](ROADMAP.md).
+Plan for a Wootility-style macro editor: a per-key timeline of the sequence, live recording into that timeline, and a simulation panel that plays the macro virtually. Status: **agreed, not started** (decisions taken 2026-09-10, see the table at the end). Progress is tracked in [ROADMAP.md](ROADMAP.md).
 
 ## What the reference does
 
@@ -124,7 +124,7 @@ Small, and none to the stored format:
 
 | Phase | Deliverable | Depends on |
 | --- | --- | --- |
-| A. Schedule core | `compile` / `decompile` in `src/utils/schedule.ts`, Vitest set up, round-trip tests, Edit All and the recorder rewired through them (no visible change yet) | |
+| A. Schedule core | `compile` / `decompile` in `src/utils/schedule.ts`, Vitest set up, round-trip tests, Edit All and the recorder rewired through them; backend awaits timed mouse presses (decision 3) | |
 | B. Timeline, read-only | View toggle, tracks, ruler, zoom, markers and bracket, selection wired to the right panel | A |
 | C. Timeline editing | Move, resize, draw, delete, multi-select, nudge, snapping, end-marker drag, palette click / drag-in, undo through the existing unsaved-changes flow | B |
 | D. Recording into the timeline | Live bars and playhead, append at playhead, trash, fixed timings through the decompiler | A, B |
@@ -134,16 +134,18 @@ Small, and none to the stored format:
 
 A is the foundation and is worth doing even if nothing else ships: it removes the special cases in the recorder and Edit All. B–C are the bulk of the UI work. D and E are independent of each other. Each phase is one pull request and one testable build.
 
-## Decisions to take
+## Decisions
 
-| # | Question | Recommendation |
+All taken on 2026-09-10.
+
+| # | Question | Decision |
 | --- | --- | --- |
-| 1 | Replace the list, or add the timeline beside it? | Both, with a toggle. List stays the default until the timeline has been used for a few weeks, then Timeline becomes the default for new macros. |
-| 2 | Keep the linear sequence as the source of truth? | Yes (section 1). A native time-based format is a full migration for no gain in expressiveness. |
-| 3 | Mouse `DownUp` today does **not** hold up the sequence (it runs as a separate task, unlike a key `DownUp` which does). On the timeline that would show the next element starting while the button is still held. | Change the backend to await it like keys. It alters timing only for macros that put something right after a mouse press with a duration, which were overlapping by accident. |
-| 4 | Simulation: frontend player first, backend dry run later? | Yes. The player is needed anyway for scrubbing and the playhead; the dry run adds fidelity for the sequence part when it is worth it. |
-| 5 | Recording: append at the playhead, or replace the sequence? | Append, with the trash button to clear first. Matches the reference and does not throw work away. |
-| 6 | Countdown before recording starts? | No. The first key press defines t = 0, as today. |
-| 7 | Rows per key (reference) or one row per element? | Per key; it is the whole point of the view (overlaps become visible). |
-| 8 | Output preview keyboard layout | US only, labelled; the HID map has no layout information. |
-| 9 | `Profiles` group | Out of scope (Wootility owns profiles). |
+| 1 | Replace the list, or add the timeline beside it? | **Both, with a toggle.** List stays the default until the timeline has been used for a few weeks, then Timeline becomes the default for new macros. |
+| 2 | Keep the linear sequence as the source of truth? | **Yes** (section 1). A native time-based format is a full migration for no gain in expressiveness. |
+| 3 | Mouse `DownUp` today does **not** hold up the sequence (it runs as a separate task, unlike a key `DownUp` which does). On the timeline that would show the next element starting while the button is still held. | **Change the backend to await it like keys** (phase A). It alters timing only for macros that put something right after a mouse press with a duration, which were overlapping by accident; a deliberate hold across other elements is still expressed as Down, the elements, Up. |
+| 4 | Simulation: frontend player first, backend dry run later? | **Yes.** The player is needed anyway for scrubbing and the playhead, and is pinned by unit tests against the verified E2E scenarios; the dry run adds fidelity for the sequence part when it is worth it. |
+| 5 | Recording: append at the playhead, or replace the sequence? | **Append**, with the trash button to clear first. Matches the reference and does not throw work away. |
+| 6 | Countdown before recording starts? | **No.** The first key press defines t = 0, as today. |
+| 7 | Rows per key (reference) or one row per element? | **Per key**; it is the whole point of the view (overlaps become visible). |
+| 8 | Output preview keyboard layout | **US only, labelled**; the HID map has no layout information. |
+| 9 | `Profiles` group | **Out of scope** (Wootility owns profiles). |
