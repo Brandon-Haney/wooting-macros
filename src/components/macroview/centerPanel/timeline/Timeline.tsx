@@ -690,6 +690,8 @@ export default function Timeline({
 
   const scrollbarStyles = useScrollbarStyles()
   const borderColour = useBorderColour()
+  // Same panel background as the list view, so switching views does not change the tone.
+  const panelBg = useColorModeValue('primary-light.100', 'bg-dark')
   const rowBg = useColorModeValue('primary-light.50', 'primary-dark.800')
   const rowAltBg = useColorModeValue('primary-light.100', 'primary-dark.700')
   const gridColour = useColorModeValue('blackAlpha.200', 'whiteAlpha.200')
@@ -724,6 +726,7 @@ export default function Timeline({
         align="center"
         justify="center"
         px={4}
+        bg={panelBg}
         onDragOver={(event) => {
           if (event.dataTransfer.types.includes(ELEMENT_DRAG_TYPE)) event.preventDefault()
         }}
@@ -753,7 +756,7 @@ export default function Timeline({
   const ghostOffset = looping ? iteration : null
 
   return (
-    <Flex direction="column" w="full" h="full" minH={0}>
+    <Flex direction="column" w="full" h="full" minH={0} bg={panelBg}>
       <HStack w="full" px={[2, 4, 6]} py={1} justify="space-between" spacing={2}>
         <Tooltip
           label="Drag a bar to move it (Shift snaps to 10 ms), its edges to resize; right-click a bar for duplicate, delete and move-to-key. Click a row label to select the whole row, right-click it to change its key or delete it. Drag on empty space to add a press, click to place the record cursor, Ctrl+drag to select several. Drag the end marker to set the gap before the next loop. Delete removes, arrows nudge."
