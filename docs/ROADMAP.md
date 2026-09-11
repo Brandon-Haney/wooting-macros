@@ -4,7 +4,7 @@ Where the fork is, what is planned, and what has been decided. Companion to
 [BACKLOG.md](BACKLOG.md), which triages the upstream issue tracker; this file tracks our own
 priorities. Update it in the same commit as the feature.
 
-Status legend: **done** (shipped on `feature/on-hold-macros`), **building** (in progress),
+Status legend: **done** (on `feature/on-hold-macros`; released items are listed in [CHANGELOG.md](../CHANGELOG.md)), **building** (in progress),
 **next** (agreed, not started), **proposed** (needs a decision), **later** (agreed, low priority),
 **dropped** (decided against, with the reason).
 
@@ -33,21 +33,21 @@ remaps, and reliable across a whole gaming session.
 | Trigger dialog records immediately for new macros | done | |
 | Macro Settings modal (gear) with Behaviour tab | done | Repeat count, hold threshold, tap mode |
 | Editor keyboard shortcuts | done | Delete removes the selected element, Ctrl+S saves, Escape closes dialogs, Ctrl+D duplicates |
-| Status bar / activity feedback | done | Bottom status strip (option A of the mockups): state, focus, armed +N, last fired with burst count, version; hover card with every armed collection and recent activity |
+| Status bar / activity feedback | done, unreleased | Bottom status strip (option A of the mockups): state, focus, armed +N, last fired with burst count, version; hover card with every armed collection and recent activity |
 | Tray menu with collection states | done | See and toggle collections from the tray icon |
 | Import / export / duplicate | done | Collections and macros to JSON files; duplicate into another collection (upstream #161, #162) |
-| Type text element (upstream #237) | done | Text as keystrokes for apps that block paste |
+| Type text element (upstream #237) | done, unreleased | Text as keystrokes for apps that block paste |
 | Per-macro application scope | done | "Only in these applications" on a macro, layered on the collection link |
-| Global pause hotkey | done | Settings > Macro Output; works while paused too, keys are swallowed |
+| Global pause hotkey | done, unreleased | Settings > Macro Output; works while paused too, keys are swallowed |
 | Versioning and release builds | done | 1.2.0; GitHub Releases with installers; updater on our own key |
 
 ## Quality of life
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Bulk element edits (upstream #262) | done | Edit All: set every delay, compact delays, remove delays, set every press duration. Multi-select still later |
+| Bulk element edits (upstream #262) | done, unreleased | Edit All: set every delay, compact delays, remove delays, set every press duration. Multi-select still later |
 | Inline element editing on the sequence card | later | |
-| Recording with a single global delay / compact delays | done | Settings: Record with fixed timings; Compact delays in Edit All |
+| Recording with a single global delay / compact delays | done, unreleased | Settings: Record with fixed timings; Compact delays in Edit All |
 | Sound on macro activation (upstream #144) | later | rodio is already a dependency |
 | Diagnostics export | later | Zip log and config |
 | Default element duration setting (upstream #163) | later | Macro Defaults tab is still a placeholder |
@@ -61,7 +61,7 @@ remaps, and reliable across a whole gaming session.
 | Item | Status | Notes |
 | --- | --- | --- |
 | Backlog triage of upstream issues and PRs | done | [BACKLOG.md](BACKLOG.md) |
-| Debug builds crash on Rust 1.98 (single-instance plugin) | done | Plugin vendored under src-tauri/vendor with a null guard |
+| Debug builds crash on Rust 1.98 (single-instance plugin) | done, unreleased | Plugin vendored under src-tauri/vendor with a null guard |
 | Tauri 2 migration, dependency refresh | later | Phase 3 |
 | Rebase the rdev fork on upstream Narsil/rdev | later | Phase 3 |
 | Linux/Wayland stability | later | Phase 3 |
@@ -72,7 +72,7 @@ remaps, and reliable across a whole gaming session.
 | Question | Decision |
 | --- | --- |
 | Base branch | Upstream `main` (v1.1.0), not the unreleased `feature/1.2_release` refactor |
-| Code signing and updater | No code signing (no certificate). Updater enabled on our own minisign key, feed = GitHub Releases latest.json (2026-09-10) |
+| Code signing and updater | No code signing (no certificate). Updater enabled on our own minisign key (password protected since the evening of 2026-09-10; key rotated, so installs of the 1.2.0 release need a fresh install once), feed = GitHub Releases latest.json |
 | Registry lock type | std `Mutex`, because `set_is_listening` is sync inside an async Tauri command |
 | Default tap mode | Deferred tap (Brandon uses Pass through for his X macro) |
 | UI option names | Keep upstream's names; clarify with tooltips, don't rename |
