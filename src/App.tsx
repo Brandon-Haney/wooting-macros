@@ -9,6 +9,7 @@ import { init } from 'emoji-mart'
 import './App.css'
 import { MacroProvider } from './contexts/macroContext'
 import MacroSettingsModal from './views/MacroSettingsModal'
+import StatusStrip from './components/StatusStrip'
 import SettingsModal from './views/SettingsModal'
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
   return (
     <Flex h="100vh" pos="relative" direction="column">
       <Box zIndex={-1} pos="absolute" w="full" h="full" opacity={0.15} />
+      <Box flex={1} minH={0} overflow="hidden" pos="relative">
       {viewState === ViewState.Overview && (
         <Overview onOpenSettingsModal={onOpenSettings} />
       )}
@@ -107,6 +109,8 @@ function App() {
           />
         </MacroProvider>
       )}
+      </Box>
+      <StatusStrip />
       <SettingsModal isOpen={isOpenSettings} onClose={onCloseSettings} />
     </Flex>
   )

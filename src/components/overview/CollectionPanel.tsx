@@ -181,7 +181,7 @@ export default function CollectionPanel({ searchValue }: Props) {
   ])
 
   return (
-    <VStack w="full" h="100vh" spacing="0">
+    <VStack w="full" h="full" spacing="0">
       <Flex
         bg={useMainBgColour()}
         justifyContent="space-between"

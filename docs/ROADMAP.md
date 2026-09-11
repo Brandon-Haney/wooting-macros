@@ -33,7 +33,7 @@ remaps, and reliable across a whole gaming session.
 | Trigger dialog records immediately for new macros | done | |
 | Macro Settings modal (gear) with Behaviour tab | done | Repeat count, hold threshold, tap mode |
 | Editor keyboard shortcuts | done | Delete removes the selected element, Ctrl+S saves, Escape closes dialogs, Ctrl+D duplicates |
-| Status bar / activity feedback | done | Hook alive, foreground application, armed collections, last macro fired |
+| Status bar / activity feedback | done | Bottom status strip (option A of the mockups): state, focus, armed +N, last fired with burst count, version; hover card with every armed collection and recent activity |
 | Tray menu with collection states | done | See and toggle collections from the tray icon |
 | Import / export / duplicate | done | Collections and macros to JSON files; duplicate into another collection (upstream #161, #162) |
 | Type text element (upstream #237) | done | Text as keystrokes for apps that block paste |
