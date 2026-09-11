@@ -14,13 +14,12 @@ import {
   VStack
 } from '@chakra-ui/react'
 import { DeleteIcon, EditIcon, SettingsIcon, TimeIcon } from '@chakra-ui/icons'
-import { useCallback, useRef, useState } from 'react'
-import { ActionEventType } from '../../../types'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMacroContext } from '../../../contexts/macroContext'
 import useRecordingSequence from '../../../hooks/useRecordingSequence'
 import { useSettingsContext } from '../../../contexts/settingsContext'
 import { checkIfElementIsEditable } from '../../../constants/utils'
-import { decompile, Schedule } from '../../../utils/schedule'
+import { compile, decompile, Schedule } from '../../../utils/schedule'
 import ClearSequenceModal from './ClearSequenceModal'
 import BulkEditModal from './BulkEditModal'
 import { RecordIcon, StopIcon } from '../../icons'
@@ -47,6 +46,9 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   const timelineView = config.SequenceView === 'Timeline'
   const [simulate, setSimulate] = useState(false)
   const [playhead, setPlayhead] = useState<number | null>(null)
+  // Where a recording is inserted on the timeline; null appends at the end.
+  const [recordCursor, setRecordCursor] = useState<number | null>(null)
+  const [recordingPlayhead, setRecordingPlayhead] = useState<number | null>(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const {
     isOpen: isBulkOpen,
@@ -54,13 +56,32 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
     onClose: onBulkClose
   } = useDisclosure()
 
-  // The sequence as it was when recording started; recorded events are
-  // appended to it after every key so the list updates live.
-  const base = useRef<ActionEventType[]>([])
+  // The schedule as it was when recording started and where the recording
+  // goes; recorded bars are merged in after every key so both views update live.
+  const base = useRef<Schedule>(compile([]))
+  const insertAt = useRef(0)
 
   const onRecorded = useCallback(
     (recorded: Schedule) => {
-      const next = [...base.current, ...decompile(recorded)]
+      const offset = insertAt.current
+      const merged: Schedule = {
+        tracks: [
+          ...base.current.tracks,
+          ...recorded.tracks.filter((t) => !base.current.tracks.some((b) => b.id === t.id))
+        ],
+        bars: [
+          ...base.current.bars,
+          ...recorded.bars.map((bar) => ({
+            ...bar,
+            id: `rec${bar.id}`,
+            start: bar.start + offset,
+            end: bar.end + offset
+          }))
+        ],
+        instants: base.current.instants,
+        total: Math.max(base.current.total, offset + recorded.total)
+      }
+      const next = decompile(merged)
       overwriteSequence(next)
       const last = next[next.length - 1]
       if (config.AutoSelectElement && last && checkIfElementIsEditable(last)) {
@@ -75,11 +96,27 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   const recorder = useRecordingSequence(onRecorded, {
     fixedStepMs: config.RecordFixedTimings ? config.DefaultDelayValue : undefined
   })
-  const { recording, stopRecording } = recorder
+  const { recording, stopRecording, elapsed } = recorder
   const startRecording = useCallback(() => {
-    base.current = ids.map((id) => sequence[id - 1]).filter(Boolean)
+    base.current = compile(ids.map((id) => sequence[id - 1]).filter(Boolean))
+    insertAt.current = timelineView && recordCursor !== null ? recordCursor : base.current.total
     recorder.startRecording()
-  }, [ids, recorder, sequence])
+  }, [ids, recordCursor, recorder, sequence, timelineView])
+
+  // Live playhead while recording.
+  useEffect(() => {
+    if (!recording) {
+      setRecordingPlayhead(null)
+      return
+    }
+    let frame = 0
+    const tick = () => {
+      setRecordingPlayhead(insertAt.current + elapsed())
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [elapsed, recording])
 
   return (
     <VStack flex="1" minW={0} h="full" bg={useMainBgColour()} justifyContent="top">
@@ -227,7 +264,12 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
       />
       <Divider w="full" />
       {timelineView ? (
-        <Timeline recording={recording} playhead={simulate ? playhead : null} />
+        <Timeline
+          recording={recording}
+          playhead={recording ? recordingPlayhead : simulate ? playhead : null}
+          recordCursor={recordCursor}
+          onRecordCursor={setRecordCursor}
+        />
       ) : (
         <SortableList recording={recording} stopRecording={stopRecording} />
       )}

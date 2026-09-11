@@ -10,6 +10,7 @@ import {
 } from '@chakra-ui/react'
 import { AddIcon, MinusIcon } from '@chakra-ui/icons'
 import {
+  DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
   useCallback,
@@ -24,19 +25,24 @@ import { HIDLookup } from '../../../../constants/HIDmap'
 import { mouseEnumLookup } from '../../../../constants/MouseMap'
 import { getElementDisplayString } from '../../../../constants/utils'
 import { DefaultMacroDelay } from '../../../../constants'
+import { ActionEventType } from '../../../../types'
 import {
   Bar,
   compile,
   decompile,
   EVENTS_TRACK,
   Instant,
+  keyTrack,
+  mouseTrack,
   Schedule,
   Track
 } from '../../../../utils/schedule'
 import {
   addBar,
+  addInstant,
   findItem,
   itemsForElements,
+  itemsInRect,
   moveBarToTrack,
   moveItems,
   removeItems,
@@ -44,6 +50,7 @@ import {
   setTotal,
   snap
 } from '../../../../utils/scheduleEdit'
+import { iterationLength } from '../../../../utils/simulation'
 import {
   canvasWidth,
   clampZoom,
@@ -63,11 +70,17 @@ const BAR_INSET = 7
 const EDGE_PX = 6
 const SNAP_PX = 6
 const DRAG_THRESHOLD_PX = 3
+/** MIME type of palette elements dragged onto the timeline. */
+export const ELEMENT_DRAG_TYPE = 'application/x-wootomation-element'
 
 interface Props {
   recording: boolean
-  /** Simulation position within the iteration, drawn as a moving line. */
+  /** Simulation or recording position within the iteration, drawn as a moving line. */
   playhead?: number | null
+  /** Where the next recording is inserted; null means the end of the sequence. */
+  recordCursor?: number | null
+  /** A click on empty space sets the record cursor. */
+  onRecordCursor?: (ms: number | null) => void
 }
 
 type Drag =
@@ -82,12 +95,20 @@ type Drag =
       shift: boolean
     }
   | { kind: 'resize'; id: string; edge: 'start' | 'end'; track: string }
-  | { kind: 'draw'; track: string; anchor: number; moved: boolean }
+  | { kind: 'draw'; track: string; anchor: number; moved: boolean; startX: number }
   | { kind: 'end' }
+  | { kind: 'band'; startX: number; startY: number }
 
 interface Reselect {
   track: string
   at: number
+}
+
+interface BandRect {
+  left: number
+  top: number
+  width: number
+  height: number
 }
 
 /**
@@ -96,7 +117,12 @@ interface Reselect {
  * iteration at `total`. Bars can be dragged, resized and drawn; every edit
  * is decompiled back into the sequence.
  */
-export default function Timeline({ recording, playhead = null }: Props) {
+export default function Timeline({
+  recording,
+  playhead = null,
+  recordCursor = null,
+  onRecordCursor
+}: Props) {
   const {
     macro,
     sequence,
@@ -121,6 +147,8 @@ export default function Timeline({ recording, playhead = null }: Props) {
   const dragRef = useRef<Drag | null>(null)
   const pendingSelect = useRef<Reselect | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [band, setBand] = useState<BandRect | null>(null)
+  const [dropHint, setDropHint] = useState<number | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState(0)
@@ -128,6 +156,11 @@ export default function Timeline({ recording, playhead = null }: Props) {
   const [zoomed, setZoomed] = useState(false)
   const pxRef = useRef(pxPerMs)
   pxRef.current = pxPerMs
+
+  const looping = macro.macro_type !== 'Single'
+  const iteration = useMemo(() => iterationLength(view, macro.macro_type), [view, macro.macro_type])
+  /** Time span drawn: one iteration plus a ghost of the next for looping macros. */
+  const extent = looping ? iteration + view.total : view.total
 
   useLayoutEffect(() => {
     const node = scrollRef.current
@@ -143,10 +176,11 @@ export default function Timeline({ recording, playhead = null }: Props) {
   }, [])
 
   // Fit on open and whenever the sequence changes until the user zooms.
+  const fitTo = looping ? iteration + schedule.total : schedule.total
   useEffect(() => {
     if (zoomed || viewport === 0) return
-    setPxPerMs(fitZoom(schedule.total, viewport - LABEL_WIDTH - 16))
-  }, [schedule.total, viewport, zoomed])
+    setPxPerMs(fitZoom(fitTo, viewport - LABEL_WIDTH - 16))
+  }, [fitTo, viewport, zoomed])
 
   const zoomBy = useCallback((factor: number) => {
     setZoomed(true)
@@ -154,8 +188,8 @@ export default function Timeline({ recording, playhead = null }: Props) {
   }, [])
   const fit = useCallback(() => {
     setZoomed(false)
-    setPxPerMs(fitZoom(schedule.total, viewport - LABEL_WIDTH - 16))
-  }, [schedule.total, viewport])
+    setPxPerMs(fitZoom(fitTo, viewport - LABEL_WIDTH - 16))
+  }, [fitTo, viewport])
 
   // Ctrl+wheel zooms around the pointer.
   useEffect(() => {
@@ -193,7 +227,7 @@ export default function Timeline({ recording, playhead = null }: Props) {
     if (item) {
       setSelectedIds(new Set([item.id]))
       const source = 'start' in item ? item.source[0] : item.source
-      if (source !== undefined) updateSelectedElementId(storageIndex(source))
+      if (source !== undefined && source >= 0) updateSelectedElementId(storageIndex(source))
     }
   }, [schedule, storageIndex, updateSelectedElementId])
 
@@ -223,6 +257,16 @@ export default function Timeline({ recording, playhead = null }: Props) {
     const rect = node.getBoundingClientRect()
     return Math.floor((clientY - rect.top + node.scrollTop - RULER_HEIGHT) / ROW_HEIGHT)
   }, [])
+  /** Canvas pixel position (relative to the scrolled content) of a client point. */
+  const canvasPoint = useCallback((clientX: number, clientY: number) => {
+    const node = scrollRef.current
+    if (!node) return { x: 0, y: 0 }
+    const rect = node.getBoundingClientRect()
+    return {
+      x: clientX - rect.left + node.scrollLeft,
+      y: clientY - rect.top + node.scrollTop - RULER_HEIGHT
+    }
+  }, [])
   const snapMs = useCallback(
     (base: Schedule, ms: number, ignore: Set<string>, shift: boolean) =>
       snap(base, ms, SNAP_PX / pxRef.current, ignore, shift ? 10 : 1),
@@ -231,6 +275,24 @@ export default function Timeline({ recording, playhead = null }: Props) {
 
   const scheduleRef = useRef(schedule)
   scheduleRef.current = schedule
+
+  const selectItem = useCallback(
+    (item: Bar | Instant, additive: boolean) => {
+      const id = item.id
+      setSelectedIds((current) => {
+        if (additive) {
+          const next = new Set(current)
+          if (next.has(id)) next.delete(id)
+          else next.add(id)
+          return next
+        }
+        return new Set([id])
+      })
+      const source = 'start' in item ? item.source[0] : item.source
+      if (source !== undefined && source >= 0) updateSelectedElementId(storageIndex(source))
+    },
+    [storageIndex, updateSelectedElementId]
+  )
 
   const beginDrag = useCallback(
     (drag: Drag, event: ReactPointerEvent) => {
@@ -241,6 +303,7 @@ export default function Timeline({ recording, playhead = null }: Props) {
       const base = scheduleRef.current
       let latest: Schedule = base
       let lastMs = 0
+      let bandIds = new Set<string>()
 
       const onMove = (e: PointerEvent) => {
         const d = dragRef.current
@@ -248,7 +311,11 @@ export default function Timeline({ recording, playhead = null }: Props) {
         const shift = e.shiftKey
         switch (d.kind) {
           case 'move': {
-            if (!d.moved && Math.abs(e.clientX - d.startX) < DRAG_THRESHOLD_PX && Math.abs(e.clientY - d.startY) < DRAG_THRESHOLD_PX) {
+            if (
+              !d.moved &&
+              Math.abs(e.clientX - d.startX) < DRAG_THRESHOLD_PX &&
+              Math.abs(e.clientY - d.startY) < DRAG_THRESHOLD_PX
+            ) {
               return
             }
             d.moved = true
@@ -264,25 +331,48 @@ export default function Timeline({ recording, playhead = null }: Props) {
                 latest = moveBarToTrack(latest, d.primary.id, track.id)
               }
             }
-            break
+            setDraft(latest)
+            return
           }
           case 'resize': {
             const at = snapMs(base, msAt(e.clientX), new Set([d.id]), shift)
             latest = resizeBar(base, d.id, d.edge, at)
-            break
+            setDraft(latest)
+            return
           }
           case 'draw': {
+            if (!d.moved && Math.abs(e.clientX - d.startX) < DRAG_THRESHOLD_PX) return
+            d.moved = true
             const at = snapMs(base, msAt(e.clientX), new Set(), shift)
-            if (Math.abs(at - d.anchor) >= 1) d.moved = true
             latest = addBar(base, d.track, Math.min(at, d.anchor), Math.abs(at - d.anchor))
-            break
+            setDraft(latest)
+            return
           }
           case 'end': {
             latest = setTotal(base, snapMs(base, msAt(e.clientX), new Set(), shift))
-            break
+            setDraft(latest)
+            return
+          }
+          case 'band': {
+            const a = canvasPoint(d.startX, d.startY)
+            const b = canvasPoint(e.clientX, e.clientY)
+            const left = Math.min(a.x, b.x)
+            const right = Math.max(a.x, b.x)
+            const top = Math.max(0, Math.min(a.y, b.y))
+            const bottom = Math.max(a.y, b.y)
+            setBand({ left, top, width: right - left, height: bottom - top })
+            const px = pxRef.current
+            bandIds = itemsInRect(
+              base,
+              (left - LABEL_WIDTH) / px,
+              (right - LABEL_WIDTH) / px,
+              Math.floor(top / ROW_HEIGHT),
+              Math.floor(bottom / ROW_HEIGHT)
+            )
+            setSelectedIds(new Set(bandIds))
+            return
           }
         }
-        setDraft(latest)
       }
 
       const onUp = (e: PointerEvent) => {
@@ -294,20 +384,8 @@ export default function Timeline({ recording, playhead = null }: Props) {
         switch (d.kind) {
           case 'move': {
             if (!d.moved) {
-              // A click: select, Shift adds to the selection.
               setDraft(null)
-              const id = d.primary.id
-              setSelectedIds((current) => {
-                if (d.shift) {
-                  const next = new Set(current)
-                  if (next.has(id)) next.delete(id)
-                  else next.add(id)
-                  return next
-                }
-                return new Set([id])
-              })
-              const source = 'start' in d.primary ? d.primary.source[0] : d.primary.source
-              if (source !== undefined) updateSelectedElementId(storageIndex(source))
+              selectItem(d.primary, d.shift)
               return
             }
             const bar = latest.bars.find((b) => b.id === d.primary.id)
@@ -325,9 +403,11 @@ export default function Timeline({ recording, playhead = null }: Props) {
           }
           case 'draw': {
             if (!d.moved) {
-              const at = snapMs(base, msAt(e.clientX), new Set(), e.shiftKey)
-              latest = addBar(base, d.track, at, DefaultMacroDelay)
-              commit(latest, { track: d.track, at })
+              // A click on empty space: place the record cursor there.
+              setDraft(null)
+              setSelectedIds(new Set())
+              updateSelectedElementId(undefined)
+              onRecordCursor?.(Math.round(d.anchor))
               return
             }
             const added = latest.bars[latest.bars.length - 1]
@@ -337,13 +417,37 @@ export default function Timeline({ recording, playhead = null }: Props) {
           case 'end':
             commit(latest)
             return
+          case 'band': {
+            setBand(null)
+            const first = [...bandIds][0]
+            const item =
+              base.bars.find((b) => b.id === first) ?? base.instants.find((i) => i.id === first)
+            if (item) {
+              const source = 'start' in item ? item.source[0] : item.source
+              if (source !== undefined && source >= 0) updateSelectedElementId(storageIndex(source))
+            } else if (!e.shiftKey) {
+              updateSelectedElementId(undefined)
+            }
+            return
+          }
         }
       }
 
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
     },
-    [commit, msAt, recording, rowAt, snapMs, storageIndex, updateSelectedElementId]
+    [
+      canvasPoint,
+      commit,
+      msAt,
+      onRecordCursor,
+      recording,
+      rowAt,
+      selectItem,
+      snapMs,
+      storageIndex,
+      updateSelectedElementId
+    ]
   )
 
   const isSelected = useCallback(
@@ -375,6 +479,7 @@ export default function Timeline({ recording, playhead = null }: Props) {
       const target = activeIds()
       if (event.key === 'Escape') {
         clearSelection()
+        onRecordCursor?.(null)
         event.stopPropagation()
         return
       }
@@ -393,13 +498,68 @@ export default function Timeline({ recording, playhead = null }: Props) {
         const first = [...target][0]
         const bar = next.bars.find((b) => b.id === first)
         const instant = next.instants.find((i) => i.id === first)
-        commit(next, bar ? { track: bar.track, at: bar.start } : instant ? { track: EVENTS_TRACK, at: instant.at } : undefined)
+        commit(
+          next,
+          bar
+            ? { track: bar.track, at: bar.start }
+            : instant
+              ? { track: EVENTS_TRACK, at: instant.at }
+              : undefined
+        )
       }
     },
-    [activeIds, clearSelection, commit, recording, schedule]
+    [activeIds, clearSelection, commit, onRecordCursor, recording, schedule]
   )
 
-  const width = canvasWidth(view.total, pxPerMs, 0)
+  // Elements dragged in from the palette.
+  const onDragOver = useCallback(
+    (event: ReactDragEvent) => {
+      if (recording || !event.dataTransfer.types.includes(ELEMENT_DRAG_TYPE)) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+      setDropHint(Math.max(0, msAt(event.clientX)))
+    },
+    [msAt, recording]
+  )
+  const onDrop = useCallback(
+    (event: ReactDragEvent) => {
+      setDropHint(null)
+      const raw = event.dataTransfer.getData(ELEMENT_DRAG_TYPE)
+      if (!raw || recording) return
+      event.preventDefault()
+      let element: ActionEventType
+      try {
+        element = JSON.parse(raw) as ActionEventType
+      } catch {
+        return
+      }
+      const at = snapMs(schedule, msAt(event.clientX), new Set(), event.shiftKey)
+      if (element.type === 'KeyPressEventAction') {
+        const track = keyTrack(element.data.keypress)
+        commit(addBar(schedule, track, at, element.data.press_duration || DefaultMacroDelay), {
+          track,
+          at
+        })
+      } else if (element.type === 'MouseEventAction') {
+        const action = element.data.data
+        const track = mouseTrack(action.button)
+        const length = action.type === 'DownUp' ? action.duration : DefaultMacroDelay
+        commit(addBar(schedule, track, at, length), { track, at })
+      } else if (element.type === 'SystemEventAction') {
+        commit(addInstant(schedule, element, at), { track: EVENTS_TRACK, at })
+      } else if (element.type === 'DelayEventAction') {
+        // A delay is a gap: push everything at or after the drop point.
+        const later = new Set<string>()
+        for (const bar of schedule.bars) if (bar.start >= at) later.add(bar.id)
+        for (const i of schedule.instants) if (i.at >= at) later.add(i.id)
+        const next = later.size > 0 ? moveItems(schedule, later, element.data) : setTotal(schedule, schedule.total + element.data)
+        commit(next)
+      }
+    },
+    [commit, msAt, recording, schedule, snapMs]
+  )
+
+  const width = canvasWidth(extent, pxPerMs, 0)
   const step = tickStep(pxPerMs)
   const tickList = ticks(width / pxPerMs, step)
 
@@ -414,6 +574,9 @@ export default function Timeline({ recording, playhead = null }: Props) {
   const endColour = useColorModeValue('primary-accent.600', 'primary-accent.400')
   const mutedText = useColorModeValue('gray.600', 'gray.400')
   const playheadColour = useColorModeValue('green.500', 'green.300')
+  const recordColour = useColorModeValue('red.500', 'red.300')
+  const bandColour = useColorModeValue('rgba(66, 153, 225, 0.2)', 'rgba(144, 205, 244, 0.2)')
+  const bandBorder = useColorModeValue('blue.400', 'blue.200')
 
   const bracketLabel = useMemo(() => {
     const count = macro.repeat_count ?? null
@@ -429,10 +592,30 @@ export default function Timeline({ recording, playhead = null }: Props) {
 
   if (ordered.length === 0) {
     return (
-      <Flex w="full" h="full" align="center" justify="center" px={4}>
+      <Flex
+        w="full"
+        h="full"
+        align="center"
+        justify="center"
+        px={4}
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes(ELEMENT_DRAG_TYPE)) event.preventDefault()
+        }}
+        onDrop={(event) => {
+          const raw = event.dataTransfer.getData(ELEMENT_DRAG_TYPE)
+          if (!raw) return
+          event.preventDefault()
+          try {
+            const element = JSON.parse(raw) as ActionEventType
+            overwriteSequence([element])
+          } catch {
+            /* ignore */
+          }
+        }}
+      >
         <Text fontSize="sm" color={mutedText} textAlign="center">
-          No elements yet. Record a sequence or add keys from the palette; each
-          press becomes a bar on its key&apos;s row.
+          No elements yet. Record a sequence, click a key in the palette or drag one
+          here; each press becomes a bar on its key&apos;s row.
         </Text>
       </Flex>
     )
@@ -441,14 +624,25 @@ export default function Timeline({ recording, playhead = null }: Props) {
   const totalX = view.total * pxPerMs
   const tracksHeight = view.tracks.length * ROW_HEIGHT
   const rowOf = (track: string) => view.tracks.findIndex((t) => t.id === track)
+  const ghostOffset = looping ? iteration : null
 
   return (
     <Flex direction="column" w="full" h="full" minH={0}>
       <HStack w="full" px={[2, 4, 6]} py={1} justify="space-between" spacing={2}>
-        <Text fontSize="xs" color={mutedText} noOfLines={1}>
-          One iteration: {formatMs(view.total)}. Drag bars to move, edges to resize, empty
-          space to add; drag the end marker for the loop gap.
-        </Text>
+        <Tooltip
+          label="Drag a bar to move it (Shift snaps to 10 ms), its edges to resize. Drag on empty space to add a press, click to place the record cursor, Ctrl+drag to select several. Drag the end marker to set the gap before the next loop. Delete removes, arrows nudge."
+          hasArrow
+          variant="brand"
+          openDelay={300}
+        >
+          <Text fontSize="xs" color={mutedText} noOfLines={1} cursor="help">
+            One iteration: {formatMs(view.total)}
+            {looping && iteration > view.total
+              ? `, loops every ${formatMs(iteration)} (minimum loop time)`
+              : ''}
+            . Hover for editing help.
+          </Text>
+        </Tooltip>
         <HStack spacing={1} flexShrink={0}>
           <Tooltip label="Zoom out (Ctrl + wheel)" hasArrow variant="brand">
             <IconButton
@@ -490,6 +684,9 @@ export default function Timeline({ recording, playhead = null }: Props) {
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) clearSelection()
         }}
+        onDragOver={onDragOver}
+        onDragLeave={() => setDropHint(null)}
+        onDrop={onDrop}
       >
         <Box position="relative" w={`${LABEL_WIDTH + width}px`} minW="100%" minH="full">
           {/* Ruler */}
@@ -543,12 +740,20 @@ export default function Timeline({ recording, playhead = null }: Props) {
                 width={width}
                 onPointerDown={(event) => {
                   if (event.target !== event.currentTarget) return
-                  if (track.kind === 'events') {
-                    clearSelection()
+                  if (event.ctrlKey || event.metaKey) {
+                    beginDrag({ kind: 'band', startX: event.clientX, startY: event.clientY }, event)
                     return
                   }
                   const anchor = snapMs(schedule, msAt(event.clientX), new Set(), event.shiftKey)
-                  beginDrag({ kind: 'draw', track: track.id, anchor, moved: false }, event)
+                  if (track.kind === 'events') {
+                    clearSelection()
+                    onRecordCursor?.(Math.round(anchor))
+                    return
+                  }
+                  beginDrag(
+                    { kind: 'draw', track: track.id, anchor, moved: false, startX: event.clientX },
+                    event
+                  )
                 }}
               />
             ))}
@@ -564,6 +769,38 @@ export default function Timeline({ recording, playhead = null }: Props) {
                 pointerEvents="none"
               />
             ))}
+            {/* Ghost of the next iteration */}
+            {ghostOffset !== null &&
+              view.bars.map((bar) => (
+                <Box
+                  key={`g${bar.id}`}
+                  position="absolute"
+                  left={`${LABEL_WIDTH + (ghostOffset + bar.start) * pxPerMs}px`}
+                  top={`${rowOf(bar.track) * ROW_HEIGHT + BAR_INSET}px`}
+                  w={`${Math.max((bar.end - bar.start) * pxPerMs, 3)}px`}
+                  h={`${ROW_HEIGHT - BAR_INSET * 2}px`}
+                  bg={barColour}
+                  opacity={0.25}
+                  rounded="sm"
+                  pointerEvents="none"
+                />
+              ))}
+            {ghostOffset !== null &&
+              view.instants.map((instant) => (
+                <Box
+                  key={`g${instant.id}`}
+                  position="absolute"
+                  left={`${LABEL_WIDTH + (ghostOffset + instant.at) * pxPerMs - 6}px`}
+                  top={`${rowOf(EVENTS_TRACK) * ROW_HEIGHT + BAR_INSET + 4}px`}
+                  w="12px"
+                  h="12px"
+                  bg={barColour}
+                  opacity={0.25}
+                  transform="rotate(45deg)"
+                  rounded="2px"
+                  pointerEvents="none"
+                />
+              ))}
             {view.bars.map((bar) => (
               <BarView
                 key={bar.id}
@@ -623,12 +860,53 @@ export default function Timeline({ recording, playhead = null }: Props) {
             {playhead !== null && (
               <Box
                 position="absolute"
-                left={`${LABEL_WIDTH + Math.min(playhead, view.total) * pxPerMs - 1}px`}
+                left={`${LABEL_WIDTH + Math.min(playhead, extent) * pxPerMs - 1}px`}
+                top={0}
+                h="full"
+                w="2px"
+                bg={recording ? recordColour : playheadColour}
+                zIndex={2}
+                pointerEvents="none"
+              />
+            )}
+            {recordCursor !== null && !recording && (
+              <Tooltip label={`Recording starts here, at ${formatMs(recordCursor)}. Escape clears.`} hasArrow variant="brand">
+                <Box
+                  position="absolute"
+                  left={`${LABEL_WIDTH + recordCursor * pxPerMs - 1}px`}
+                  top={0}
+                  h="full"
+                  w="2px"
+                  borderLeft="2px dashed"
+                  borderColor={recordColour}
+                  zIndex={2}
+                />
+              </Tooltip>
+            )}
+            {dropHint !== null && (
+              <Box
+                position="absolute"
+                left={`${LABEL_WIDTH + dropHint * pxPerMs - 1}px`}
                 top={0}
                 h="full"
                 w="2px"
                 bg={playheadColour}
+                opacity={0.7}
                 zIndex={2}
+                pointerEvents="none"
+              />
+            )}
+            {band && (
+              <Box
+                position="absolute"
+                left={`${band.left}px`}
+                top={`${band.top}px`}
+                w={`${band.width}px`}
+                h={`${band.height}px`}
+                bg={bandColour}
+                border="1px solid"
+                borderColor={bandBorder}
+                zIndex={3}
                 pointerEvents="none"
               />
             )}
@@ -636,9 +914,17 @@ export default function Timeline({ recording, playhead = null }: Props) {
             <Marker
               x={LABEL_WIDTH + totalX}
               colour={endColour}
-              label={`End of iteration, ${formatMs(view.total)}. Drag to set the gap before the next loop.`}
+              label={`End of the sequence, ${formatMs(view.total)}. Drag to set the gap before the next loop.`}
               onPointerDown={(event) => beginDrag({ kind: 'end' }, event)}
             />
+            {ghostOffset !== null && (
+              <Marker
+                x={LABEL_WIDTH + ghostOffset * pxPerMs}
+                colour={triggerColour}
+                label={`Next iteration starts here (${formatMs(iteration)}) while the macro keeps looping`}
+                faint
+              />
+            )}
           </Box>
 
           {/* Bracket */}
@@ -863,12 +1149,14 @@ function Marker({
   x,
   colour,
   label,
-  onPointerDown
+  onPointerDown,
+  faint = false
 }: {
   x: number
   colour: string
   label: string
   onPointerDown?: (event: ReactPointerEvent) => void
+  faint?: boolean
 }) {
   return (
     <Tooltip label={label} hasArrow variant="brand" openDelay={300}>
@@ -879,19 +1167,31 @@ function Marker({
         h="full"
         w="8px"
         zIndex={2}
+        opacity={faint ? 0.4 : 1}
         cursor={onPointerDown ? 'ew-resize' : 'default'}
         onPointerDown={onPointerDown}
       >
-        <Box position="absolute" left="3px" top={0} h="full" w="2px" bg={colour} />
         <Box
           position="absolute"
-          top="-5px"
-          left="-1px"
-          w="10px"
-          h="10px"
-          rounded="full"
-          bg={colour}
+          left="3px"
+          top={0}
+          h="full"
+          w="2px"
+          bg={faint ? undefined : colour}
+          borderLeft={faint ? '2px dashed' : undefined}
+          borderColor={colour}
         />
+        {!faint && (
+          <Box
+            position="absolute"
+            top="-5px"
+            left="-1px"
+            w="10px"
+            h="10px"
+            rounded="full"
+            bg={colour}
+          />
+        )}
       </Box>
     </Tooltip>
   )

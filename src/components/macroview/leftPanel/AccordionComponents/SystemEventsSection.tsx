@@ -9,13 +9,21 @@ import {
 } from '@chakra-ui/react'
 import { SystemEventInfo } from '../../../../constants/SystemEventMap'
 import { SystemIcon } from '../../../icons'
+import { Tooltip } from '@chakra-ui/react'
 import SelectElementButton from '../SelectElementButton'
 
 interface Props {
   elementsToRender: SystemEventInfo[]
+  title?: string
+  /** Shown on the group header. */
+  hint?: string
 }
 
-export default function SystemEventsSection({ elementsToRender }: Props) {
+export default function SystemEventsSection({
+  elementsToRender,
+  title = 'System Events',
+  hint
+}: Props) {
   return (
     <AccordionItem>
       <h2>
@@ -28,7 +36,9 @@ export default function SystemEventsSection({ elementsToRender }: Props) {
             gap={2}
           >
             <SystemIcon />
-            System Events
+            <Tooltip label={hint} hasArrow variant="brand" isDisabled={!hint} openDelay={400}>
+              <span>{title}</span>
+            </Tooltip>
           </Flex>
           <AccordionIcon boxSize={6} />
         </AccordionButton>

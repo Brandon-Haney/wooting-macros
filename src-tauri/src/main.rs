@@ -84,6 +84,12 @@ async fn list_processes() -> Result<Vec<String>, ()> {
 }
 
 #[tauri::command]
+/// Plays a macro's sequence once, for the editor's test pad.
+async fn run_macro(state: tauri::State<'_, MacroBackend>, macros: Macro) -> Result<(), String> {
+    state.run_macro(macros).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 /// Health snapshot for the status bar.
 async fn get_status(state: tauri::State<'_, MacroBackend>) -> Result<BackendStatus, ()> {
     Ok(state.status())
@@ -375,7 +381,8 @@ async fn main() -> Result<(), Error> {
             is_debug,
             list_processes,
             list_applications,
-            get_status
+            get_status,
+            run_macro
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;

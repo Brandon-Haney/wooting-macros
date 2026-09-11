@@ -6,6 +6,7 @@ import {
   HStack,
   Kbd,
   Tag,
+  Textarea,
   Text,
   Tooltip,
   useColorModeValue,
@@ -14,6 +15,8 @@ import {
   WrapItem
 } from '@chakra-ui/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { invoke } from '@tauri-apps/api'
+import { error } from 'tauri-plugin-log'
 import { useMacroContext } from '../../../../contexts/macroContext'
 import { HIDLookup } from '../../../../constants/HIDmap'
 import { mouseEnumLookup } from '../../../../constants/MouseMap'
@@ -63,7 +66,9 @@ function trackLabel(track: string): string {
  */
 export default function SimulationPanel({ onPlayhead }: Props) {
   const { macro } = useMacroContext()
-  const { schedule } = useSchedule()
+  const { schedule, ordered } = useSchedule()
+  const [padText, setPadText] = useState('')
+  const pad = useRef<HTMLTextAreaElement>(null)
   const [speed, setSpeed] = useState(1)
   const [state, setState] = useState<SimulationState | null>(null)
   const simulation = useRef<Simulation | null>(null)
@@ -151,6 +156,14 @@ export default function SimulationPanel({ onPlayhead }: Props) {
     simulation.current?.reset()
     publish()
   }, [publish, stopLoop])
+
+  /** Plays the macro through the real executor with focus in the text box below. */
+  const runForReal = useCallback(() => {
+    pad.current?.focus()
+    invoke<void>('run_macro', { macros: { ...macro, sequence: ordered } }).catch((e: string) =>
+      error(e)
+    )
+  }, [macro, ordered])
 
   const mutedText = useColorModeValue('gray.600', 'gray.400')
   const panelBg = useColorModeValue('primary-light.50', 'primary-dark.800')
@@ -256,6 +269,33 @@ export default function SimulationPanel({ onPlayhead }: Props) {
           </Box>
         </VStack>
       </HStack>
+
+      <VStack align="start" spacing={1} w="full">
+        <HStack w="full" justify="space-between">
+          <Text fontSize="xs" color={mutedText}>
+            Test pad: the sequence is sent for real, once, with the cursor in this box
+          </Text>
+          <Tooltip
+            label="Runs the sequence through the same executor as a trigger would. Keep the cursor in the box; whatever has focus receives the keys."
+            hasArrow
+            variant="brand"
+          >
+            <Button size="xs" variant="brand" onClick={runForReal}>
+              Run for real
+            </Button>
+          </Tooltip>
+        </HStack>
+        <Textarea
+          ref={pad}
+          size="xs"
+          rows={2}
+          resize="vertical"
+          value={padText}
+          onChange={(event) => setPadText(event.target.value)}
+          placeholder="Click here, then Run for real"
+          fontFamily="mono"
+        />
+      </VStack>
 
       <VStack align="start" spacing={1}>
         <Text fontSize="xs" color={mutedText}>

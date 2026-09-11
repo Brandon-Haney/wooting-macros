@@ -95,6 +95,8 @@ function answer(message: Message): unknown {
       return macros
     case 'get_status':
       return { hook_healthy: true, is_listening: true, foreground_process: 'preview.exe' }
+    case 'run_macro':
+      return undefined
     case 'is_debug':
       return true
     case 'list_processes':

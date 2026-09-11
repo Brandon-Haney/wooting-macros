@@ -1,4 +1,5 @@
 import { Bar, Instant, Schedule, Track, EVENTS_TRACK } from './schedule'
+import { SystemEventAction } from '../types'
 
 /**
  * Pure edits on a schedule, used by the timeline's drag interactions. Each
@@ -162,4 +163,38 @@ export function snap(
   }
   for (const i of schedule.instants) if (!ignore.has(i.id)) consider(i.at)
   return Math.max(0, best)
+}
+
+/** Adds a system event on the Events track. */
+export function addInstant(schedule: Schedule, element: SystemEventAction, at: number): Schedule {
+  const instant: Instant = {
+    id: `n${Date.now()}${schedule.instants.length}`,
+    at: Math.max(0, at),
+    width: 0,
+    source: -1,
+    element
+  }
+  return withTotal(withTracks({ ...schedule, instants: [...schedule.instants, instant] }))
+}
+
+/** Bars and instants whose extent intersects the rectangle (ms × row). */
+export function itemsInRect(
+  schedule: Schedule,
+  fromMs: number,
+  toMs: number,
+  fromRow: number,
+  toRow: number
+): Set<string> {
+  const rowOf = (track: string) => schedule.tracks.findIndex((t) => t.id === track)
+  const ids = new Set<string>()
+  for (const bar of schedule.bars) {
+    const row = rowOf(bar.track)
+    if (row < fromRow || row > toRow) continue
+    if (bar.end >= fromMs && bar.start <= toMs) ids.add(bar.id)
+  }
+  const eventsRow = rowOf(EVENTS_TRACK)
+  if (eventsRow >= fromRow && eventsRow <= toRow) {
+    for (const i of schedule.instants) if (i.at >= fromMs && i.at <= toMs) ids.add(i.id)
+  }
+  return ids
 }

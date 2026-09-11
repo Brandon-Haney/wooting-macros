@@ -190,5 +190,12 @@ export default function useRecordingSequence(
     }
   }, [recording, addKeypress, addMousepress])
 
-  return { recording, startRecording, stopRecording }
+  /** Ms since the first recorded event, or 0 before it. */
+  const elapsed = useCallback(() => {
+    if (origin.current === undefined) return 0
+    if (fixedStepMs !== undefined) return events.current * fixedStepMs
+    return Math.max(0, performance.now() - origin.current)
+  }, [fixedStepMs])
+
+  return { recording, startRecording, stopRecording, elapsed }
 }

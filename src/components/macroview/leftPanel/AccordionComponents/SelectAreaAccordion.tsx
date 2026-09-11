@@ -87,6 +87,40 @@ export default function SelectAreaAccordion({ searchValue }: Props) {
     )
   }, [searchValue])
 
+  // The reference groups: macro and collection controls, media, then the rest.
+  const systemGroups = useMemo(() => {
+    const functions = ['Run Macro', 'Enable Collection', 'Disable Collection', 'Toggle Collection']
+    const media = [
+      'Increase Volume',
+      'Decrease Volume',
+      'Toggle Mute Volume',
+      'Toggle Mute Microphone',
+      'Next Track',
+      'Previous Track',
+      'Stop Media',
+      'Play/Pause Media'
+    ]
+    return [
+      {
+        title: 'Functions',
+        hint: 'Run another macro, enable or disable a collection',
+        elements: systemEventElements.filter((e) => functions.includes(e.displayString))
+      },
+      {
+        title: 'Media and Volume',
+        hint: 'Volume, microphone and media keys',
+        elements: systemEventElements.filter((e) => media.includes(e.displayString))
+      },
+      {
+        title: 'System',
+        hint: 'Open files, folders and websites; paste or type text',
+        elements: systemEventElements.filter(
+          (e) => !functions.includes(e.displayString) && !media.includes(e.displayString)
+        )
+      }
+    ]
+  }, [systemEventElements])
+
   const indices = useMemo(() => {
     if (searchValue.trim() === '') {
       return undefined
@@ -94,9 +128,11 @@ export default function SelectAreaAccordion({ searchValue }: Props) {
 
     let count = 0
 
-    if (systemEventElements.length > 0) {
-      count++
-    }
+    systemGroups.forEach((group) => {
+      if (group.elements.length > 0) {
+        count++
+      }
+    })
 
     keyboardKeyCategories.forEach((category) => {
       if (category.elements.length > 0) {
@@ -114,12 +150,7 @@ export default function SelectAreaAccordion({ searchValue }: Props) {
       count++
     }
     return [...Array(count).keys()]
-  }, [
-    searchValue,
-    systemEventElements.length,
-    keyboardKeyCategories,
-    mouseElements.length
-  ])
+  }, [searchValue, systemGroups, keyboardKeyCategories, mouseElements.length])
 
   const isValidSearch = useMemo(() => {
     return indices !== undefined && indices.length === 0
@@ -143,12 +174,20 @@ export default function SelectAreaAccordion({ searchValue }: Props) {
         </>
       )}
       <Accordion w="full" variant="brand" allowMultiple p={0} index={indices}>
-        {systemEventElements.length > 0 && (
-          <SystemEventsSection elementsToRender={systemEventElements} />
-        )}
         <KeyboardKeysSection keyboardKeyCategories={keyboardKeyCategories} />
         {mouseElements.length > 0 && (
           <MouseButtonsSection elementsToRender={mouseElements} />
+        )}
+        {systemGroups.map(
+          (group) =>
+            group.elements.length > 0 && (
+              <SystemEventsSection
+                key={group.title}
+                title={group.title}
+                hint={group.hint}
+                elementsToRender={group.elements}
+              />
+            )
         )}
         {/* <PluginsSection pluginCategories={pluginCategories} /> */}
       </Accordion>

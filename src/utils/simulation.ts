@@ -74,6 +74,13 @@ function injectedEvents(bars: Bar[]): number {
   return count
 }
 
+/** Length of one loop iteration: the sequence, or the loop's minimum time if longer. */
+export function iterationLength(schedule: Schedule, macroType: string): number {
+  if (macroType === 'Single') return schedule.total
+  const minimum = Math.max(MIN_LOOP_ITERATION_MS, injectedEvents(schedule.bars) * KEYPRESS_DELAY_MS)
+  return Math.max(schedule.total, minimum)
+}
+
 export class Simulation {
   readonly config: SimulationConfig
   private edges: Edge[]
@@ -88,11 +95,7 @@ export class Simulation {
   constructor(config: SimulationConfig) {
     this.config = config
     this.edges = edgesOf(config.schedule)
-    const looping = config.macroType !== 'Single'
-    const minimum = looping
-      ? Math.max(MIN_LOOP_ITERATION_MS, injectedEvents(config.schedule.bars) * KEYPRESS_DELAY_MS)
-      : 0
-    this.iterationMs = Math.max(config.schedule.total, minimum)
+    this.iterationMs = iterationLength(config.schedule, config.macroType)
     this.maxLoops =
       config.macroType === 'Single'
         ? Math.max(1, config.repeatCount ?? 1)

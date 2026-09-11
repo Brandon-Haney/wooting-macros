@@ -486,6 +486,8 @@ pub struct MacroBackend {
     hook_events: Arc<AtomicU64>,
     hook_healthy: Arc<AtomicBool>,
     pause_hotkey: Arc<Mutex<Vec<u32>>>,
+    /// Execution context from `init`, for running a macro on request (the editor's test pad).
+    context: Mutex<Option<ExecutionContext>>,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -1254,6 +1256,17 @@ impl MacroBackend {
     }
 
     /// Health snapshot for the UI.
+    /// Plays a macro's sequence once through the executor, as if its trigger had fired.
+    /// Used by the editor's test pad; the output goes to whatever window has focus.
+    pub fn run_macro(&self, macros: Macro) -> Result<()> {
+        let context = lock_or_recover(&self.context)
+            .clone()
+            .ok_or_else(|| Error::msg("backend not initialised"))?;
+        info!("Running macro {:?} on request", macros.name);
+        run_once(macros, &context);
+        Ok(())
+    }
+
     pub fn status(&self) -> BackendStatus {
         BackendStatus {
             hook_healthy: self.hook_healthy.load(Ordering::Relaxed),
@@ -1339,6 +1352,7 @@ impl MacroBackend {
             pause_hotkey: self.pause_hotkey.clone(),
         };
         *lock_or_recover(&self.pause_hotkey) = self.config.read().await.pause_hotkey.clone();
+        *lock_or_recover(&self.context) = Some(context.clone());
 
         // Create the executor
         let executor_injected = context.injected.clone();
@@ -1665,6 +1679,7 @@ impl Default for MacroBackend {
             hook_events: Arc::new(AtomicU64::new(0)),
             hook_healthy: Arc::new(AtomicBool::new(true)),
             pause_hotkey: Arc::new(Mutex::new(Vec::new())),
+            context: Mutex::new(None),
         }
     }
 }

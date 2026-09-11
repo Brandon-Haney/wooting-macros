@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { useMacroContext } from '../../../contexts/macroContext'
 import { useSettingsContext } from '../../../contexts/settingsContext'
 import { ActionEventType } from '../../../types'
+import { ELEMENT_DRAG_TYPE } from '../centerPanel/timeline/Timeline'
 
 interface Props {
   properties: ActionEventType
@@ -76,6 +77,12 @@ export default function SelectElementButton({
         borderColor={borderColour}
         rounded="md"
         onClick={handleAddElement}
+        draggable
+        onDragStart={(event) => {
+          // Dropping on the timeline places the element at that time.
+          event.dataTransfer.setData(ELEMENT_DRAG_TYPE, JSON.stringify(properties))
+          event.dataTransfer.effectAllowed = 'copy'
+        }}
         transition="ease-out 150ms"
         // Keys and mouse buttons look like keycaps, matching the Kbd element used elsewhere.
         {...(isKeycap
