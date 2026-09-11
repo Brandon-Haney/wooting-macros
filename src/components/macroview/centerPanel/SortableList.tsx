@@ -1,4 +1,5 @@
-import { useColorModeValue, VStack } from '@chakra-ui/react'
+import { Text, useColorModeValue, VStack } from '@chakra-ui/react'
+import useMainBgColour from '../../../hooks/useMainBgColour'
 import {
   closestCenter,
   DndContext,
@@ -38,7 +39,9 @@ export default function SortableList({ recording, stopRecording }: Props) {
       coordinateGetter: sortableKeyboardCoordinates
     })
   )
-  const backgroundColor = useColorModeValue("primary-light.100", "bg-dark")
+  // Same background as the rest of the panel; the timeline matches it.
+  const backgroundColor = useMainBgColour()
+  const mutedText = useColorModeValue('gray.600', 'gray.400')
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -86,7 +89,13 @@ export default function SortableList({ recording, stopRecording }: Props) {
           overflowY="auto"
           overflowX="hidden"
           sx={useScrollbarStyles()}
+          justifyContent={ids.length === 0 ? 'center' : undefined}
         >
+          {ids.length === 0 && (
+            <Text fontSize="sm" color={mutedText} textAlign="center" px={4}>
+              No elements yet. Record a sequence or click a key in the palette to add it.
+            </Text>
+          )}
           {ids.map((id) => (
             <SortableWrapper
               id={id}

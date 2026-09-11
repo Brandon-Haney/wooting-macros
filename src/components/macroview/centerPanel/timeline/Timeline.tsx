@@ -65,6 +65,7 @@ import {
   ticks
 } from '../../../../utils/timelineMath'
 import useBorderColour from '../../../../hooks/useBorderColour'
+import useMainBgColour from '../../../../hooks/useMainBgColour'
 import useScrollbarStyles from '../../../../hooks/useScrollbarStyles'
 
 const LABEL_WIDTH = 96
@@ -691,7 +692,7 @@ export default function Timeline({
   const scrollbarStyles = useScrollbarStyles()
   const borderColour = useBorderColour()
   // Same panel background as the list view, so switching views does not change the tone.
-  const panelBg = useColorModeValue('primary-light.100', 'bg-dark')
+  const panelBg = useMainBgColour()
   const rowBg = useColorModeValue('primary-light.50', 'primary-dark.800')
   const rowAltBg = useColorModeValue('primary-light.100', 'primary-dark.700')
   const gridColour = useColorModeValue('blackAlpha.200', 'whiteAlpha.200')
