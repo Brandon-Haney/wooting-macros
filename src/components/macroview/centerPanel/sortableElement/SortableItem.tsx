@@ -10,7 +10,8 @@ import {
   MenuList,
   Text,
   useColorModeValue,
-  VStack
+  VStack,
+  Kbd
 } from '@chakra-ui/react'
 import React, { useCallback, useMemo } from 'react'
 import { useMacroContext } from '../../../../contexts/macroContext'
@@ -139,17 +140,31 @@ export default function SortableItem({ id, element, recording }: Props) {
           justifyContent="center"
           rounded="md"
         >
-          <Text
-            h="fit-content"
-            fontWeight={
-              selectedElementId !== undefined && id === selectedElementId + 1
-                ? 'bold'
-                : 'normal'
-            }
-            noOfLines={1}
-          >
-            {displayText}
-          </Text>
+          {element.type === 'KeyPressEventAction' ||
+          element.type === 'MouseEventAction' ? (
+            <Kbd
+              variant="brand"
+              fontWeight={
+                selectedElementId !== undefined && id === selectedElementId + 1
+                  ? 'bold'
+                  : 'semibold'
+              }
+            >
+              {displayText}
+            </Kbd>
+          ) : (
+            <Text
+              h="fit-content"
+              fontWeight={
+                selectedElementId !== undefined && id === selectedElementId + 1
+                  ? 'bold'
+                  : 'normal'
+              }
+              noOfLines={1}
+            >
+              {displayText}
+            </Text>
+          )}
         </Flex>
       </HStack>
       <HStack py={2} pr={2} h="full" spacing={0} gap={2} alignItems="flex-end">

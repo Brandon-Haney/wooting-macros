@@ -8,7 +8,8 @@ import {
   Text,
   useColorModeValue,
   useToast,
-  VStack
+  VStack,
+  Kbd
 } from '@chakra-ui/react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useMacroContext } from '../../../../contexts/macroContext'
@@ -23,7 +24,6 @@ import {
 import { MouseEventAction } from '../../../../types'
 
 import { DefaultMouseDelay } from '../../../../constants'
-import { BoxText } from '../EditArea'
 
 interface Props {
   selectedElementId: number
@@ -52,10 +52,9 @@ export default function MousePressForm({
     }
 
     setHeadingText(
-      <BoxText>
-        {mouseEnumLookup.get(selectedElement.data.data.button)?.displayString ??
-          ''}
-      </BoxText>
+      <Text>Editing element</Text>
+        <Kbd variant="brand" fontSize="md">{mouseEnumLookup.get(selectedElement.data.data.button)?.displayString ??
+          ''}</Kbd>
     )
   }, [bg, kebabColour, selectedElement])
 

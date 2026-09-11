@@ -9,7 +9,8 @@ import {
   Text,
   useColorModeValue,
   useToast,
-  VStack
+  VStack,
+  Kbd
 } from '@chakra-ui/react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useMacroContext } from '../../../../contexts/macroContext'
@@ -22,7 +23,6 @@ import {
 } from '../../../icons'
 import { KeyPressEventAction } from '../../../../types'
 
-import { BoxText } from '../EditArea'
 import { HIDLookup } from '../../../../constants/HIDmap'
 import { DefaultMacroDelay } from "../../../../constants";
 
@@ -125,9 +125,8 @@ export default function KeyPressForm({
   return (
     <>
       <HStack justifyContent="center" p={1}>
-        <BoxText>
-          {HIDLookup.get(selectedElement.data.keypress)?.displayString ?? ''}
-        </BoxText>
+        <Text>Editing element</Text>
+        <Kbd variant="brand" fontSize="md">{HIDLookup.get(selectedElement.data.keypress)?.displayString ?? ''}</Kbd>
       </HStack>
       <Divider />
       <Grid templateRows="20px 1fr" gap="2" w="full">
