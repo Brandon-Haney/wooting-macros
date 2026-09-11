@@ -89,7 +89,7 @@ export default function MacroTypeArea() {
           placement="bottom"
           hasArrow
         >
-          <Text fontSize="xs" opacity={0.7} whiteSpace="nowrap">
+          <Text fontSize="xs" opacity={0.7} whiteSpace="nowrap" maxW="150px" noOfLines={1}>
             {summary}
           </Text>
         </Tooltip>

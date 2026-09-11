@@ -189,13 +189,13 @@ export default function CollectionPanel({ searchValue }: Props) {
         py={2}
         px={4}
         w="full"
-        h="90px"
+        minH="90px"
         borderBottom="1px"
         borderColor={borderColour}
       >
         {!isSearching ? (
-          <HStack w="full" justifyContent="space-between">
-            <HStack w="full" spacing={4}>
+          <HStack w="full" justifyContent="space-between" flexWrap="wrap" rowGap={2}>
+            <HStack flex={1} minW="240px" spacing={4}>
               <EmojiPopover
                 shortcodeToShow={currentCollection.icon}
                 isEmojiPopoverOpen={isEmojiPopoverOpen}
@@ -217,7 +217,7 @@ export default function CollectionPanel({ searchValue }: Props) {
                 _focusVisible={{ borderColor: 'primary-accent.500' }}
               />
             </HStack>
-            <HStack w="fit">
+            <HStack w="fit" flexShrink={0}>
               {/* <Button leftIcon={<AddIcon />} size={['xs', 'sm', 'md']} isDisabled>
               Export Collection
             </Button>

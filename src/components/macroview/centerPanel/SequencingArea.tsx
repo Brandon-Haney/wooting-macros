@@ -177,6 +177,9 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         justifyContent="center"
         w="full"
         alignItems="center"
+        flexWrap="wrap"
+        rowGap={2}
+        spacing={2}
         px={[2, 4, 6]}
       >
         <Text fontWeight="semibold" fontSize={['sm', 'md']}>
@@ -185,8 +188,8 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         <Button
           variant="brandRecord"
           leftIcon={recording ? <StopIcon /> : <RecordIcon />}
-          size={['xs', 'sm', 'md']}
-          fontSize={['xs', 'xs', 'lg']}
+          size="sm"
+          fontSize="sm"
           isActive={recording}
           onClick={recording ? stopRecording : startRecording}
         >
@@ -195,8 +198,8 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         <Button
           variant="brandRecord"
           leftIcon={<TimeIcon />}
-          size={['xs', 'sm', 'md']}
-          fontSize={['xs', 'xs', 'lg']}
+          size="sm"
+          fontSize="sm"
           onClick={() => {
             onElementAdd({
               type: 'DelayEventAction',
@@ -209,8 +212,8 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         <Button
           variant="brandRecord"
           leftIcon={<EditIcon />}
-          size={['xs', 'sm', 'md']}
-          fontSize={['xs', 'xs', 'lg']}
+          size="sm"
+          fontSize="sm"
           onClick={onBulkOpen}
           isDisabled={sequence.length === 0}
         >
@@ -219,8 +222,8 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         <Button
           variant="brandWarning"
           leftIcon={<DeleteIcon />}
-          size={['xs', 'sm', 'md']}
-          fontSize={['xs', 'xs', 'lg']}
+          size="sm"
+          fontSize="sm"
           onClick={onOpen}
           isDisabled={sequence.length === 0}
         >
@@ -236,7 +239,7 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
             variant="brand"
             aria-label="MacroSettings"
             icon={<SettingsIcon />}
-            size={['xs', 'sm', 'md']}
+            size="sm"
             onClick={onOpenMacroSettingsModal}
           />
         </Tooltip>

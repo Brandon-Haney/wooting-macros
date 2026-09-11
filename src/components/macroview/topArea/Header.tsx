@@ -147,7 +147,7 @@ export default function Header({ isEditing }: Props) {
         justifyContent="space-between"
         justifyItems="center"
       >
-        <Flex maxW="400px" h="full" alignItems="center" gap="4">
+        <Flex maxW="400px" minW="180px" flexShrink={1} h="full" alignItems="center" gap="4">
           <IconButton
             aria-label="Back"
             variant="brand"
@@ -176,7 +176,7 @@ export default function Header({ isEditing }: Props) {
           />
         </Flex>
         <MacroTypeArea />
-        <Flex maxW="700px" flexGrow={1} gap={4} alignItems="center">
+        <Flex maxW="700px" flexGrow={1} flexShrink={0} gap={4} alignItems="center">
           <TriggerArea onOpen={onTriggerModalOpen} />
           <Tooltip
             variant="brand"
