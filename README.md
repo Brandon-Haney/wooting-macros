@@ -70,6 +70,7 @@ If you had Wooting's original Wootomation installed, uninstall it first: both us
 
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version.
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned work, status and decisions.
+- [docs/TIMELINE_EDITOR_PLAN.md](docs/TIMELINE_EDITOR_PLAN.md): proposal for a timeline editor with simulation.
 - [docs/BACKLOG.md](docs/BACKLOG.md): triage of the upstream issue tracker.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the backend works.
 - [CONTRIBUTING.md](CONTRIBUTING.md): building, testing and releasing.

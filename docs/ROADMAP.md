@@ -46,6 +46,7 @@ remaps, and reliable across a whole gaming session.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Bulk element edits (upstream #262) | done, unreleased | Edit All: set every delay, compact delays, remove delays, set every press duration. Multi-select still later |
+| Timeline macro editor with simulation (Wootility-style) | proposed | Per-key timeline view, recording into it, virtual simulation panel; plan in [TIMELINE_EDITOR_PLAN.md](TIMELINE_EDITOR_PLAN.md) |
 | Inline element editing on the sequence card | later | |
 | Recording with a single global delay / compact delays | done, unreleased | Settings: Record with fixed timings; Compact delays in Edit All |
 | Sound on macro activation (upstream #144) | later | rodio is already a dependency |
