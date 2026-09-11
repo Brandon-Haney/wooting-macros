@@ -28,6 +28,8 @@ import { open } from '@tauri-apps/api/dialog'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { listApplications } from '../constants/utils'
 import { ApplicationEntry } from '../types'
+import useApplicationIcons from '../hooks/useApplicationIcons'
+import AppIcon from './AppIcon'
 import { error } from 'tauri-plugin-log'
 import useScrollbarStyles from '../hooks/useScrollbarStyles'
 
@@ -39,6 +41,8 @@ interface Props {
   /** Currently linked executable names. */
   linked: string[]
   onChange: (linked: string[]) => void
+  /** Pick one application instead of linking several: rows choose and close. */
+  onPick?: (entry: ApplicationEntry) => void
 }
 
 const sameExe = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
@@ -50,9 +54,13 @@ export default function ApplicationPickerModal({
   title,
   description,
   linked,
-  onChange
+  onChange,
+  onPick
 }: Props) {
+  const pickMode = onPick !== undefined
   const [applications, setApplications] = useState<ApplicationEntry[]>([])
+  const icons = useApplicationIcons(applications)
+  const iconBg = useColorModeValue('primary-light.100', 'primary-dark.600')
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [showBackground, setShowBackground] = useState(false)
@@ -143,13 +151,30 @@ export default function ApplicationPickerModal({
       spacing={3}
       cursor="pointer"
       _hover={{ bg: rowHover }}
-      onClick={() => toggleExe(entry.exe)}
+      onClick={() => {
+        if (pickMode) {
+          onPick(entry)
+          onClose()
+        } else {
+          toggleExe(entry.exe)
+        }
+      }}
     >
-      <Checkbox
-        isChecked={isLinked(entry.exe)}
-        pointerEvents="none"
-        colorScheme="primary-accent"
-      />
+      {!pickMode && (
+        <Checkbox
+          isChecked={isLinked(entry.exe)}
+          pointerEvents="none"
+          colorScheme="primary-accent"
+        />
+      )}
+      {(() => {
+        const icon = entry.path ? icons.get(entry.path) : undefined
+        return icon ? (
+          <AppIcon icon={icon} size={24} />
+        ) : (
+          <Box boxSize="24px" rounded="sm" bg={iconBg} flexShrink={0} />
+        )
+      })()}
       <VStack spacing={0} align="start" flex={1} minW={0}>
         <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
           {entry.label}
@@ -204,7 +229,7 @@ export default function ApplicationPickerModal({
         <Divider w="90%" alignSelf="center" />
         <ModalBody>
           <VStack align="stretch" spacing={3}>
-            <Wrap>
+            <Wrap display={pickMode ? 'none' : undefined}>
               {linked.length === 0 && (
                 <Text fontSize="sm" opacity={0.6}>
                   No linked applications.
@@ -278,14 +303,19 @@ export default function ApplicationPickerModal({
                 Refresh
               </Button>
             </HStack>
-            <Divider />
-            <Text fontSize="sm" fontWeight="semibold">
+            <Divider display={pickMode ? 'none' : undefined} />
+            <Text fontSize="sm" fontWeight="semibold" display={pickMode ? 'none' : undefined}>
               App not listed?
             </Text>
-            <Button size="sm" alignSelf="flex-start" onClick={browseForExe}>
+            <Button
+              size="sm"
+              alignSelf="flex-start"
+              onClick={browseForExe}
+              display={pickMode ? 'none' : undefined}
+            >
               Browse for an .exe…
             </Button>
-            <HStack>
+            <HStack display={pickMode ? 'none' : undefined}>
               <Input
                 size="sm"
                 placeholder="Or type its executable name, e.g. game.exe"
@@ -309,7 +339,7 @@ export default function ApplicationPickerModal({
                 Add
               </Button>
             </HStack>
-            <Text fontSize="xs" opacity={0.7}>
+            <Text fontSize="xs" opacity={0.7} display={pickMode ? 'none' : undefined}>
               Tip: some games start through a launcher whose process differs
               from the game. If a linked game does not work, start the game
               and pick it from Running.
@@ -317,7 +347,7 @@ export default function ApplicationPickerModal({
           </VStack>
         </ModalBody>
         <ModalFooter>
-          <Button onClick={onClose}>Done</Button>
+          <Button onClick={onClose}>{pickMode ? 'Cancel' : 'Done'}</Button>
         </ModalFooter>
       </ModalContent>
     </Modal>

@@ -169,6 +169,8 @@ export interface ApplicationEntry {
   exe: string
   label: string
   source: 'running' | 'background' | 'steam'
+  /** Full path of the executable when known, for icons. */
+  path?: string | null
 }
 
 declare global {

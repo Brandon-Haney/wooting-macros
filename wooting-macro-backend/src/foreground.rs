@@ -16,6 +16,8 @@ pub struct ApplicationEntry {
     pub label: String,
     /// `running` (has a visible window), `background` (running, no window) or `steam`.
     pub source: String,
+    /// Full path of the executable when known (Steam games, windowed programs), for icons.
+    pub path: Option<String>,
 }
 
 /// Executables that show up in game folders but are never the game itself.
@@ -124,11 +126,12 @@ pub fn steam_applications() -> Vec<ApplicationEntry> {
             }
 
             let game_dir = steamapps.join("common").join(&install_dir);
-            for exe in steam::executables_in(&game_dir) {
+            for (exe, path) in steam::executables_in(&game_dir) {
                 entries.push(ApplicationEntry {
                     exe,
                     label: name.clone(),
                     source: "steam".to_string(),
+                    path: Some(path.to_string_lossy().to_string()),
                 });
             }
         }
@@ -226,15 +229,15 @@ mod steam {
 
     /// Plausible game executables in an install folder: the top level, plus the layouts Unreal
     /// (`*/Binaries/Win64`) and Unity (`*_Data` next to the exe) use, helpers filtered out.
-    pub fn executables_in(game_dir: &Path) -> Vec<String> {
+    pub fn executables_in(game_dir: &Path) -> Vec<(String, PathBuf)> {
         let mut found = Vec::new();
         collect_executables(game_dir, 0, &mut found);
-        found.sort_by_key(|name| name.to_lowercase());
-        found.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+        found.sort_by_key(|(name, _)| name.to_lowercase());
+        found.dedup_by(|a, b| a.0.eq_ignore_ascii_case(&b.0));
         found
     }
 
-    fn collect_executables(dir: &Path, depth: u8, found: &mut Vec<String>) {
+    fn collect_executables(dir: &Path, depth: u8, found: &mut Vec<(String, PathBuf)>) {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return;
         };
@@ -257,7 +260,7 @@ mod steam {
                         .replace('/', "\\")
                         .contains("\\binaries\\");
                 if in_binaries {
-                    found.push(name.to_string());
+                    found.push((name.to_string(), path.clone()));
                 }
             }
         }
@@ -403,11 +406,27 @@ mod platform {
         names
     }
 
-    /// Full path of the first running process whose executable name matches.
-    pub fn running_process_path(exe: &str) -> Option<String> {
+    /// Full path of a process's executable, when the process can be opened.
+    pub fn process_image_path(process_id: u32) -> Option<String> {
         use windows_sys::Win32::System::Threading::{
             OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
         };
+        // SAFETY: plain Win32 calls; the handle is closed before returning.
+        unsafe {
+            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
+            if process == 0 {
+                return None;
+            }
+            let mut buffer = vec![0u16; 1024];
+            let mut size = buffer.len() as u32;
+            let ok = QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut size);
+            CloseHandle(process);
+            (ok != 0).then(|| String::from_utf16_lossy(&buffer[..size as usize]))
+        }
+    }
+
+    /// Full path of the first running process whose executable name matches.
+    pub fn running_process_path(exe: &str) -> Option<String> {
         // SAFETY: plain Win32 calls; every handle is closed before returning.
         unsafe {
             let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -426,18 +445,7 @@ mod platform {
                         .unwrap_or(entry.szExeFile.len());
                     let name = String::from_utf16_lossy(&entry.szExeFile[..length]);
                     if name.eq_ignore_ascii_case(exe) {
-                        let process =
-                            OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
-                        if process != 0 {
-                            let mut buffer = vec![0u16; 1024];
-                            let mut size = buffer.len() as u32;
-                            if QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut size)
-                                != 0
-                            {
-                                result = Some(String::from_utf16_lossy(&buffer[..size as usize]));
-                            }
-                            CloseHandle(process);
-                        }
+                        result = process_image_path(entry.th32ProcessID);
                         if result.is_some() {
                             break;
                         }
@@ -455,10 +463,10 @@ mod platform {
     /// Running programs that own a visible top-level window, keyed by executable, with the
     /// window title as label. Programs without a window are listed as `background`.
     pub fn running_applications() -> Vec<ApplicationEntry> {
-        let mut windowed: HashMap<String, String> = HashMap::new();
+        let mut windowed: HashMap<String, (String, Option<String>)> = HashMap::new();
 
         unsafe extern "system" fn enumerate(window: HWND, lparam: LPARAM) -> BOOL {
-            let windowed = &mut *(lparam as *mut HashMap<String, String>);
+            let windowed = &mut *(lparam as *mut HashMap<String, (String, Option<String>)>);
 
             // Only top-level, visible, titled windows: what the user thinks of as "open apps".
             if IsWindowVisible(window) == 0 || GetWindow(window, GW_OWNER) != 0 {
@@ -475,7 +483,9 @@ mod platform {
             let mut process_id: u32 = 0;
             GetWindowThreadProcessId(window, &mut process_id);
             if let Some(exe) = process_name(process_id) {
-                windowed.entry(exe).or_insert(title);
+                windowed
+                    .entry(exe)
+                    .or_insert((title, process_image_path(process_id)));
             }
             1
         }
@@ -488,10 +498,11 @@ mod platform {
 
         let mut entries: Vec<ApplicationEntry> = windowed
             .iter()
-            .map(|(exe, title)| ApplicationEntry {
+            .map(|(exe, (title, path))| ApplicationEntry {
                 exe: exe.clone(),
                 label: title.clone(),
                 source: "running".to_string(),
+                path: path.clone(),
             })
             .collect();
 
@@ -501,6 +512,7 @@ mod platform {
                     label: exe.clone(),
                     exe,
                     source: "background".to_string(),
+                    path: None,
                 });
             }
         }

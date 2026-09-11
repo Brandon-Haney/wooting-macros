@@ -20,6 +20,8 @@ import { invoke } from '@tauri-apps/api'
 import { open } from '@tauri-apps/api/dialog'
 import { error } from 'tauri-plugin-log'
 import AppIcon from './AppIcon'
+import ApplicationPickerModal from './ApplicationPickerModal'
+import { ApplicationEntry } from '../types'
 
 interface Props {
   shortcodeToShow: string
@@ -48,6 +50,7 @@ export default function EmojiPopover({
   const { colorMode } = useColorMode()
   const initialFocusRef = useRef<HTMLDivElement | null>(null)
   const [choices, setChoices] = useState<AppChoice[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const panelBg = useColorModeValue('white', 'primary-dark.800')
   const hoverBg = useColorModeValue('primary-light.100', 'primary-dark.600')
   const muted = useColorModeValue('gray.600', 'gray.400')
@@ -69,6 +72,17 @@ export default function EmojiPopover({
       cancelled = true
     }
   }, [isEmojiPopoverOpen, linkedProcesses])
+
+  const pickApplication = (entry: ApplicationEntry) => {
+    const request = entry.path
+      ? invoke<string>('get_file_icon', { path: entry.path })
+      : invoke<string | null>('get_application_icon', { exe: entry.exe })
+    request
+      .then((icon) => {
+        if (icon) onEmojiSelect({ shortcodes: icon })
+      })
+      .catch((e) => error(String(e)))
+  }
 
   const browse = async () => {
     try {
@@ -113,9 +127,18 @@ export default function EmojiPopover({
                 <Text fontSize="xs" fontWeight="semibold" color={muted}>
                   App icon
                 </Text>
-                <Button size="xs" variant="brand" onClick={browse}>
-                  Browse…
-                </Button>
+                <HStack spacing={1}>
+                  <Tooltip label="Running programs and installed Steam games" hasArrow variant="brand">
+                    <Button size="xs" variant="brand" onClick={() => setPickerOpen(true)}>
+                      Applications…
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Any .exe, .ico or .png file" hasArrow variant="brand">
+                    <Button size="xs" variant="brand" onClick={browse}>
+                      Browse…
+                    </Button>
+                  </Tooltip>
+                </HStack>
               </HStack>
               {choices.length > 0 ? (
                 <HStack spacing={2} flexWrap="wrap">
@@ -136,8 +159,8 @@ export default function EmojiPopover({
               ) : (
                 <Text fontSize="xs" color={muted}>
                   {linkedProcesses.length === 0
-                    ? 'Link an application to the collection to pick its icon here, or browse for an .exe, .ico or .png.'
-                    : 'No icon found for the linked applications yet (they may not be running). Browse for the .exe instead.'}
+                    ? 'Linked applications show up here. Applications… lists everything running or installed through Steam.'
+                    : 'No icon found for the linked applications yet (they may not be running). Try Applications… or Browse.'}
                 </Text>
               )}
             </VStack>
@@ -155,6 +178,15 @@ export default function EmojiPopover({
           </VStack>
         </PopoverBody>
       </PopoverContent>
+      <ApplicationPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Choose an application icon"
+        description="Running programs and games installed through Steam. Click one to use its icon."
+        linked={[]}
+        onChange={() => undefined}
+        onPick={pickApplication}
+      />
     </Popover>
   )
 }
