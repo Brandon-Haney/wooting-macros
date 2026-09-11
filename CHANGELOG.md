@@ -5,6 +5,10 @@ All notable changes to this fork. Versions are git tags; each tag is built and p
 ## Unreleased
 
 ### Added
+- Timeline view of the sequence (List / Timeline toggle above the sequence, remembered): one row per key, a bar per press, system events on an Events row, ruler with zoom (Ctrl + wheel, Fit), the trigger press at 0, the end of one iteration and a bracket labelled by the macro type. Bars can be dragged (Shift snaps to 10 ms), resized at their edges, drawn on empty rows, moved to another key, multi-selected with Shift-click, nudged with the arrow keys and deleted; dragging the end marker sets the gap before the next loop. Edits are written back into the same sequence the list shows.
+- Simulation panel (play button above the sequence): plays the macro virtually with the backend's rules for hold threshold, tap mode, repeat count and minimum loop time. Start presses the trigger, Release lets it go; shows the state, loop count, keys currently held, everything sent so far and a preview of the text it would type (US layout). A playhead moves over the timeline.
+- Recording keeps overlapping keys as overlapping presses instead of flattening them to a list of Down and Up cards; the list shows presses live while recording.
+- Browser preview for UI work: `yarn dev` then `http://localhost:1420/?mock` runs the frontend without Tauri on canned data.
 - Type Text element: text typed as keystrokes (Unicode key events), for chat boxes and launchers that block paste. A new line presses Enter.
 - Global pause hotkey (Settings > Macro Output) that toggles macro output from anywhere, also while paused. Its presses are swallowed.
 - Edit All for sequences: set every delay, compact delays, remove all delays, set every key and mouse press duration.
@@ -13,6 +17,8 @@ All notable changes to this fork. Versions are git tags; each tag is built and p
 - Bottom status strip: state, focused application, armed collections (two names plus +N), last macro fired with a burst count, version; hover for hook and output state, every armed collection with the application it waits for, and the last three macros. Replaces the status block in the left panel.
 
 ### Changed
+- A mouse press with a duration now holds up the sequence like a key press does (it used to run alongside the next element).
+- The editor's side panels stop growing past 380 / 420 px on wide windows; the sequence panel takes the rest. Macro name and type sit together on the left of the header, trigger and save on the right.
 - Sequence toolbar wraps at narrow widths; the editor header keeps its actions on screen; the collection header wraps its actions.
 - The Trigger Keys dialog keeps its key list when closed without recording, and always shows the "trigger while other keys are held" checkbox for key triggers.
 - Macro card switches show the macro's own state rather than the macro AND collection state.

@@ -1,6 +1,6 @@
 # Timeline macro editor
 
-Plan for a Wootility-style macro editor: a per-key timeline of the sequence, live recording into that timeline, and a simulation panel that plays the macro virtually. Status: **agreed, not started** (decisions taken 2026-09-10, see the table at the end). Progress is tracked in [ROADMAP.md](ROADMAP.md).
+Plan for a Wootility-style macro editor: a per-key timeline of the sequence, live recording into that timeline, and a simulation panel that plays the macro virtually. Status: **phases A–E built, unreleased** (2026-09-11); phase F (palette regrouping, polish) and G (optional) remain. Decisions in the table at the end; progress in [ROADMAP.md](ROADMAP.md).
 
 ## What the reference does
 
@@ -124,11 +124,11 @@ Small, and none to the stored format:
 
 | Phase | Deliverable | Depends on |
 | --- | --- | --- |
-| A. Schedule core | `compile` / `decompile` in `src/utils/schedule.ts`, Vitest set up, round-trip tests, Edit All and the recorder rewired through them; backend awaits timed mouse presses (decision 3) | |
-| B. Timeline, read-only | View toggle, tracks, ruler, zoom, markers and bracket, selection wired to the right panel | A |
-| C. Timeline editing | Move, resize, draw, delete, multi-select, nudge, snapping, end-marker drag, palette click / drag-in, undo through the existing unsaved-changes flow | B |
-| D. Recording into the timeline | Live bars and playhead, append at playhead, trash, fixed timings through the decompiler | A, B |
-| E. Simulation | Player, panel, playhead sync, constants command, scenario tests | A, B |
+| A. Schedule core (done) | `compile` / `decompile` in `src/utils/schedule.ts`, Vitest set up, round-trip tests, Edit All and the recorder rewired through them; backend awaits timed mouse presses (decision 3) | |
+| B. Timeline, read-only (done) | View toggle, tracks, ruler, zoom, markers and bracket, selection wired to the right panel | A |
+| C. Timeline editing (done, except rubber-band selection) | Move, resize, draw, delete, multi-select, nudge, snapping, end-marker drag, palette click / drag-in, undo through the existing unsaved-changes flow | B |
+| D. Recording into the timeline (done: the recorder builds a schedule; bars appear live in either view. Recording appends at the end; a playhead position for recording is not implemented) | Live bars and playhead, append at playhead, trash, fixed timings through the decompiler | A, B |
+| E. Simulation (done: frontend player with tests; `get_execution_constants` not needed yet, the two constants are mirrored in `simulation.ts`) | Player, panel, playhead sync, constants command, scenario tests | A, B |
 | F. Palette and polish | Regrouping, tooltips, responsive pass at the minimum window size, keyboard shortcuts, docs and changelog | B–E |
 | G. Optional | Backend dry run, test pad, ghost iterations, drag between tracks | E |
 

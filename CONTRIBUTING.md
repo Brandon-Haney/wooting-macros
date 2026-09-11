@@ -20,6 +20,10 @@ Open an issue with the steps to reproduce, the app version (bottom right of the 
 - [Tauri 1 prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites/).
 - Linux only: `xserver-xorg-input-evdev`, `libevdev2`, membership of the `input` group.
 
+### Browser preview
+
+`yarn dev`, then open `http://localhost:1420/?mock` in a browser: `src/devMock.ts` answers the Tauri commands with canned data (one collection, a macro with overlapping presses and a system event), so screens can be exercised and screenshotted without the app. Nothing is persisted. Not every command is mocked; add a case to `answer` when a screen needs one.
+
 ### Commands
 
 ```
@@ -36,6 +40,7 @@ cd wooting-macro-backend && cargo clippy --all-targets
 cd src-tauri && cargo clippy
 yarn build
 yarn lint
+yarn test                  # Vitest, pure modules only (schedule, edits, simulation)
 ```
 
 Warnings are treated as errors in CI. Use the `log` macros (`info!`, `debug!`, ...) in the backend, never `println!`.
