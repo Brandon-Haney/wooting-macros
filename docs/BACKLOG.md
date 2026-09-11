@@ -37,6 +37,8 @@ Triage of the upstream [WootingKb/wooting-macros](https://github.com/WootingKb/w
 6. **#258 scroll wheel triggers, #257 modifier + mouse button triggers.** Trigger matcher work. Medium.
 7. **#252 / #244 allow_while_other_keys.** The field exists but is unimplemented upstream. Medium.
 8. **#163 default element duration.** Small setting.
+9. **Elevated-window warning.** SendInput into an elevated window is dropped by UIPI, the most common "macro does nothing in app X" report. Detect an elevated foreground window and warn, or offer to run elevated. Small.
+10. **Scan-code-only output.** Toggle to send `KEYEVENTF_SCANCODE` events for games that key off scan codes. Small, in the rdev fork.
 
 ## Bugs still open upstream, not reproduced here
 
@@ -47,7 +49,7 @@ Triage of the upstream [WootingKb/wooting-macros](https://github.com/WootingKb/w
 
 ## Won't do
 
-- #178 on-board macros, #104 live macro keys: firmware features, see the README.
+- #178 on-board macros, #104 live macro keys: firmware features. The keyboard protocol is documented in [WOOTING_HID_PROTOCOL.md](WOOTING_HID_PROTOCOL.md); it has no macro primitive, so this needs Wooting firmware work.
 - #106 macOS: rdev grab needs accessibility permissions and a main-thread event loop; not planned.
 - #107 MIDI, #170 scripting/plugin system: out of scope for a macro tool.
 - #85 updater UI: the updater is disabled in the fork.

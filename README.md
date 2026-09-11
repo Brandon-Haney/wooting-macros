@@ -61,7 +61,7 @@ If you had Wooting's original Wootomation installed, uninstall it first: both us
 
 ## Out of scope
 
-- **On-board (firmware) macros.** Wootility and the keyboard firmware are closed source; no software project can store macros on the keyboard.
+- **On-board (firmware) macros.** The keyboard firmware has no macro primitive (see [docs/WOOTING_HID_PROTOCOL.md](docs/WOOTING_HID_PROTOCOL.md)); until Wooting adds one, no software can store macros on the keyboard.
 - **Profile switching.** Wootility already switches keyboard profiles per application through its background service; this app does not duplicate it.
 - **Anti-cheat evasion.** See the warning above.
 - **macOS.** The input grab needs accessibility permissions and a main-thread event loop the backend does not have.

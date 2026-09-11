@@ -82,8 +82,21 @@ remaps, and reliable across a whole gaming session.
 | Auto-update via GitHub Releases | Yes: CI builds installers on tag, in-app updater on our own signing key (2026-09-10) |
 | Timeline editor | Derived view over the linear sequence, List/Timeline toggle, frontend simulation first, recording appends, timed mouse presses will block the sequence like keys; full table in [TIMELINE_EDITOR_PLAN.md](TIMELINE_EDITOR_PLAN.md) (2026-09-10) |
 | Priority order of the "next" items | Editor shortcuts, status bar, tray menu, import/export, then per-macro scope and releases (2026-09-10) |
+| Keyboard protocol work | Brandon owns the hardware; reverse engineering Wootility's HID protocol for a local companion is in scope. Captured and documented in [WOOTING_HID_PROTOCOL.md](WOOTING_HID_PROTOCOL.md) (2026-09-10) |
+
+## Hardware companion (long term)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Wootility HID protocol reference | done | [WOOTING_HID_PROTOCOL.md](WOOTING_HID_PROTOCOL.md): framing, command and report tables, profile schema. The firmware has no macro primitive; on-board behaviours are remaps plus DKS, Mod Tap, Toggle Key, Rappy Snappy and SOCD |
+| Elevated-window warning | next | SendInput into an elevated window is dropped silently (UIPI); detect it and tell the user, or offer to run elevated |
+| Scan-code-only output option | later | Per-macro or global toggle to send `KEYEVENTF_SCANCODE` events for apps that read scan codes |
+| Keyboard profile switching from the foreground poller | later | `activateProfile` (cmd 23) over the config interface; would replace the Wootility service for app-linked profiles |
+| Local Wootility replacement (profiles, remaps, Advanced Keys) | later | Everything in the protocol doc is writable from a companion; needs a WebHID or hidapi client and the protobuf schema |
+| On-board macros (firmware) | in progress | Confirmed chip STM32F103xG XL-density; RE environment set up (radare2), flash-write and USB-descriptor routines located. Tracked in [ONBOARD_MACROS.md](ONBOARD_MACROS.md); background in [FIRMWARE_NOTES.md](FIRMWARE_NOTES.md) |
+| Author macros in an enhanced configurator | design | Same WebHID/Rust client as the local Wootility replacement; macros as a binding in the key picker. Executes on the host until firmware supports sequences |
 
 ## Out of scope
 
-On-board (firmware) macros, profile switching (Wootility does it), anti-cheat evasion, macOS.
+Anti-cheat evasion (making injected input look like hardware from the host side needs a kernel driver and breaks the injected-flag self-detection), macOS.
 See the README.

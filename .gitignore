@@ -42,3 +42,6 @@ dist-ssr
 /wooting-macros.key
 /wooting-macros.key.pub
 /package-lock.json
+
+# Reverse-engineering working dir: Wooting firmware images (copyright Wooting) and the radare2 binary. Not for distribution.
+firmware-re/
