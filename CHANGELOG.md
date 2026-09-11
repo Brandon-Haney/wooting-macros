@@ -5,6 +5,8 @@ All notable changes to this fork. Versions are git tags; each tag is built and p
 ## Unreleased
 
 ### Added
+- Application icons for collections and macros: the icon picker offers the icons of the collection's linked applications and a Browse button for any .exe, .ico or .png; a collection that still has the default emoji takes the icon of the first application linked to it. Icons are stored with the collection or macro, so export and import carry them.
+- Drag elements from the palette into the list view; an insertion line shows where they land.
 - Timeline: click a row label to select every press on that row (Ctrl adds rows); right-click a bar for Duplicate, Select all on this row, Move to another key and Delete; right-click a row label for Select row, Change key and Delete row. Change key remaps every press on the row through a searchable key picker.
 - The right panel has a Delete button for the selected element and, when several are selected on the timeline, a summary with Delete all and Clear selection.
 
