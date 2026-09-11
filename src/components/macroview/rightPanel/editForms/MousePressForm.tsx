@@ -9,7 +9,8 @@ import {
   useColorModeValue,
   useToast,
   VStack,
-  Kbd
+  Kbd,
+  HStack
 } from '@chakra-ui/react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useMacroContext } from '../../../../contexts/macroContext'
@@ -52,9 +53,11 @@ export default function MousePressForm({
     }
 
     setHeadingText(
-      <Text>Editing element</Text>
+      <HStack justifyContent="center" p={1}>
+        <Text>Editing element</Text>
         <Kbd variant="brand" fontSize="md">{mouseEnumLookup.get(selectedElement.data.data.button)?.displayString ??
           ''}</Kbd>
+      </HStack>
     )
   }, [bg, kebabColour, selectedElement])
 
