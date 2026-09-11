@@ -61,7 +61,7 @@ export function keyTrack(hid: number): string {
   return `k:${hid}`
 }
 
-export function motouchTrack(button: number): string {
+export function mouseTrack(button: number): string {
   return `m:${button}`
 }
 
@@ -153,7 +153,7 @@ export function compile(sequence: ActionEventType[]): Schedule {
       }
       case 'MouseEventAction': {
         const action = element.data.data
-        const track = motouchTrack(action.button)
+        const track = mouseTrack(action.button)
         if (action.type === 'Down') down(track, index)
         else if (action.type === 'Up') up(track, index)
         else press(track, index, action.duration)

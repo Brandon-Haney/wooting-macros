@@ -24,7 +24,7 @@ export default function SelectElementArea({
   const cancelSearchButtonColour = useColorModeValue('#A0AEC0', '#52525b')
 
   return (
-    <VStack w="33%" h="full" bg={useMainBgColour()} spacing={0}>
+    <VStack w="33%" maxW="380px" minW="220px" flexShrink={0} h="full" bg={useMainBgColour()} spacing={0}>
       <HStack w="full" px={[2, 4, 6]} py={[2, 4]} alignItems="center">
         <Text
           textAlign="left"

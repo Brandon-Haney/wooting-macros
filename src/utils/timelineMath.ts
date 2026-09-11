@@ -20,7 +20,8 @@ export function tickStep(pxPerMs: number, minPx = 64): number {
 /** Tick positions in ms from 0 to `total`, inclusive of the last tick before total. */
 export function ticks(total: number, step: number): number[] {
   const out: number[] = []
-  for (let t = 0; t <= total; t += step) out.push(t)
+  if (!(step > 0)) return out
+  for (let t = 0; t <= total && out.length < 500; t += step) out.push(t)
   return out
 }
 

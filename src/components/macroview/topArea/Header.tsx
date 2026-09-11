@@ -144,9 +144,10 @@ export default function Header({ isEditing }: Props) {
         px={{ base: 2, md: 4, xl: 6 }}
         gap={4}
         shadow={shadowColour}
-        justifyContent="space-between"
+        justifyContent="flex-start"
         justifyItems="center"
       >
+        {/* Name and type stay together on the left; trigger and save sit at the right edge, so a wide window does not spread them across the screen. */}
         <Flex maxW="400px" minW="180px" flexShrink={1} h="full" alignItems="center" gap="4">
           <IconButton
             aria-label="Back"
@@ -176,7 +177,7 @@ export default function Header({ isEditing }: Props) {
           />
         </Flex>
         <MacroTypeArea />
-        <Flex maxW="700px" flexGrow={1} flexShrink={0} gap={4} alignItems="center">
+        <Flex ml="auto" flexBasis="560px" maxW="640px" minW="260px" flexShrink={1} gap={4} alignItems="center">
           <TriggerArea onOpen={onTriggerModalOpen} />
           <Tooltip
             variant="brand"

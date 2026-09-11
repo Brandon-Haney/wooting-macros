@@ -79,7 +79,7 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   }, [ids, recorder, sequence])
 
   return (
-    <VStack w="41%" h="full" bg={useMainBgColour()} justifyContent="top">
+    <VStack flex="1" minW={0} h="full" bg={useMainBgColour()} justifyContent="top">
       {/** Header */}
       <VStack w="full" px={[2, 4, 6]} pt={[2, 4]}>
         <Stack

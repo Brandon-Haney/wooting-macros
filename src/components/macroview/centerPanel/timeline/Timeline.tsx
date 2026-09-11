@@ -78,7 +78,9 @@ export default function Timeline({ recording }: Props) {
     const node = scrollRef.current
     if (!node) return
     const observer = new ResizeObserver(([entry]) => {
-      setViewport(entry.contentRect.width)
+      // Ignore scrollbar-sized jitter so layout cannot oscillate.
+      const next = Math.floor(entry.contentRect.width)
+      setViewport((current) => (Math.abs(current - next) > 4 ? next : current))
     })
     observer.observe(node)
     setViewport(node.clientWidth)
@@ -124,7 +126,7 @@ export default function Timeline({ recording }: Props) {
     return () => node.removeEventListener('wheel', onWheel)
   }, [])
 
-  const width = canvasWidth(schedule.total, pxPerMs, Math.max(0, viewport - LABEL_WIDTH))
+  const width = canvasWidth(schedule.total, pxPerMs, 0)
   const step = tickStep(pxPerMs)
   const tickList = ticks(width / pxPerMs, step)
 
@@ -227,7 +229,7 @@ export default function Timeline({ recording }: Props) {
           }
         }}
       >
-        <Box position="relative" w={`${LABEL_WIDTH + width}px`} minH="full">
+        <Box position="relative" w={`${LABEL_WIDTH + width}px`} minW="100%" minH="full">
           {/* Ruler */}
           <Box
             position="sticky"
@@ -384,6 +386,7 @@ function TrackRow({
       top={`${top}px`}
       left={0}
       h={`${ROW_HEIGHT}px`}
+      minW="100%"
       w={`${LABEL_WIDTH + width}px`}
       bg={bg}
       onClick={onClickEmpty}

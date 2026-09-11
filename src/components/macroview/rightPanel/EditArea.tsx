@@ -86,6 +86,9 @@ export default function EditArea() {
     <VStack
       position="relative"
       w="26%"
+      maxW="420px"
+      minW="220px"
+      flexShrink={0}
       h="full"
       bg={useMainBgColour()}
       px={[2, 4, 6]}
