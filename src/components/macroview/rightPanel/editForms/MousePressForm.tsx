@@ -1,14 +1,13 @@
 import {
-  Button,
   Divider,
-  Flex,
   Grid,
   GridItem,
+  IconButton,
   Input,
   Text,
+  Tooltip,
   useColorModeValue,
   useToast,
-  VStack,
   Kbd,
   HStack
 } from '@chakra-ui/react'
@@ -16,12 +15,8 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useMacroContext } from '../../../../contexts/macroContext'
 import { KeyType } from '../../../../constants/enums'
 import { mouseEnumLookup } from '../../../../constants/MouseMap'
-import {
-  DownArrowIcon,
-  DownUpArrowsIcon,
-  ResetDefaultIcon,
-  UpArrowIcon
-} from '../../../icons'
+import { ResetDefaultIcon } from '../../../icons'
+import PressTypeControl from './PressTypeControl'
 import { MouseEventAction } from '../../../../types'
 
 import { DefaultMouseDelay } from '../../../../constants'
@@ -189,42 +184,7 @@ export default function MousePressForm({
           </Text>
         </GridItem>
         <GridItem w="full">
-          <Flex
-            flexDir={['column', 'column', 'column', 'row']}
-            gap="4px"
-            justifyContent="space-around"
-          >
-            <Button
-              variant="brandTertiary"
-              leftIcon={<DownUpArrowsIcon />}
-              w="full"
-              size={['sm', 'md']}
-              onClick={() => onMousepressTypeChange(KeyType.DownUp)}
-              isActive={mousepressType === KeyType.DownUp}
-            >
-              <Text fontSize={['md', 'md', 'sm']}>Full Press</Text>
-            </Button>
-            <Button
-              variant="brandTertiary"
-              leftIcon={<DownArrowIcon />}
-              w="full"
-              size={['sm', 'md']}
-              onClick={() => onMousepressTypeChange(KeyType.Down)}
-              isActive={mousepressType === KeyType.Down}
-            >
-              <Text fontSize={['md', 'md', 'sm']}>Mouse Down</Text>
-            </Button>
-            <Button
-              variant="brandTertiary"
-              leftIcon={<UpArrowIcon />}
-              w="full"
-              size={['sm', 'md']}
-              onClick={() => onMousepressTypeChange(KeyType.Up)}
-              isActive={mousepressType === KeyType.Up}
-            >
-              <Text fontSize={['md', 'md', 'sm']}>Mouse Up</Text>
-            </Button>
-          </Flex>
+          <PressTypeControl value={mousepressType} onChange={onMousepressTypeChange} noun="Mouse" />
         </GridItem>
       </Grid>
       {mousepressType === KeyType.DownUp && (
@@ -239,9 +199,10 @@ export default function MousePressForm({
               Duration (ms)
             </Text>
           </GridItem>
-          <VStack w="full">
+          <HStack w="full" spacing={2}>
             <Input
               type="number"
+              size={{ base: 'sm', md: 'md' }}
               placeholder={String(DefaultMouseDelay)}
               variant="brandAccent"
               value={mousepressDuration}
@@ -249,18 +210,17 @@ export default function MousePressForm({
               onBlur={onInputBlur}
               isInvalid={Number.isNaN(mousepressDuration)}
             />
-            <Button
-              variant="brandTertiary"
-              leftIcon={<ResetDefaultIcon />}
-              w="full"
-              value=""
-              m={1}
-              size={['sm', 'md']}
-              onClick={onResetClick}
-            >
-              <Text fontSize={['sm', 'md']}>Reset to Default</Text>
-            </Button>
-          </VStack>
+            <Tooltip label={`Reset to the default ${DefaultMouseDelay} ms`} hasArrow variant="brand">
+              <IconButton
+                variant="brandTertiary"
+                aria-label="Reset to default"
+                icon={<ResetDefaultIcon />}
+                size={{ base: 'sm', md: 'md' }}
+                onClick={onResetClick}
+                flexShrink={0}
+              />
+            </Tooltip>
+          </HStack>
         </Grid>
       )}
     </>

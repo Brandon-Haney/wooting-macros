@@ -131,7 +131,7 @@ export default function EditArea() {
                 <Kbd fontSize="xs">Del</Kbd> also removes it
               </Text>
               <Button
-                size="sm"
+                size="xs"
                 variant="brandWarning"
                 leftIcon={<DeleteIcon />}
                 onClick={() => {

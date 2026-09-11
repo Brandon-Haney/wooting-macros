@@ -56,7 +56,7 @@ export default function MacroTypeArea() {
       rounded="md"
       spacing="16px"
     >
-      <Text fontWeight="semibold" fontSize={['sm', 'md']}>
+      <Text fontWeight="semibold" fontSize={['sm', 'md']} display={{ base: 'none', md: 'block' }}>
         Macro Type
       </Text>
       <VStack spacing={0} alignItems="start">

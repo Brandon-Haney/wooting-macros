@@ -1,6 +1,7 @@
 import {
   Alert,
   AlertDescription,
+  Box,
   AlertIcon,
   Button,
   ButtonGroup,
@@ -8,7 +9,6 @@ import {
   HStack,
   IconButton,
   Stack,
-  Text,
   Tooltip,
   useDisclosure,
   VStack
@@ -146,40 +146,28 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
           )}
         </Stack>
       </VStack>
-      <HStack
-        justifyContent="center"
-        w="full"
-        alignItems="center"
-        flexWrap="wrap"
-        rowGap={2}
-        spacing={2}
-        px={[2, 4, 6]}
-      >
-        <Text fontWeight="semibold" fontSize={['sm', 'md']}>
-          Sequence
-        </Text>
-        <ButtonGroup size="sm" isAttached variant="brandRecord">
-          <Tooltip label="Elements as a list" hasArrow variant="brand">
-            <Button
-              leftIcon={<ListIcon />}
-              fontSize="sm"
+      <HStack w="full" px={[2, 4, 6]} justifyContent="space-between" spacing={2}>
+        {/* View switch */}
+        <ButtonGroup size="sm" isAttached variant="brandRecord" flexShrink={0}>
+          <Tooltip label="List view" hasArrow variant="brand">
+            <IconButton
+              aria-label="List view"
+              icon={<ListIcon />}
               isActive={!timelineView}
               onClick={() => updateSequenceView('List')}
-            >
-              List
-            </Button>
+            />
           </Tooltip>
-          <Tooltip label="Presses on a per-key timeline" hasArrow variant="brand">
-            <Button
-              leftIcon={<TimelineIcon />}
-              fontSize="sm"
+          <Tooltip label="Timeline view: presses on a per-key timeline" hasArrow variant="brand">
+            <IconButton
+              aria-label="Timeline view"
+              icon={<TimelineIcon />}
               isActive={timelineView}
               onClick={() => updateSequenceView('Timeline')}
-            >
-              Timeline
-            </Button>
+            />
           </Tooltip>
         </ButtonGroup>
+
+        {/* Primary action */}
         <Button
           variant="brandRecord"
           leftIcon={recording ? <StopIcon /> : <RecordIcon />}
@@ -187,73 +175,89 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
           fontSize="sm"
           isActive={recording}
           onClick={recording ? stopRecording : startRecording}
+          flexShrink={0}
         >
           {recording ? 'Stop' : 'Record'}
         </Button>
-        {!timelineView && (
-          <Button
-            variant="brandRecord"
-            leftIcon={<TimeIcon />}
-            size="sm"
-            fontSize="sm"
-            onClick={() => {
-              onElementAdd({
-                type: 'DelayEventAction',
-                data: config.DefaultDelayValue
-              })
-            }}
-          >
-            Add Delay
-          </Button>
-        )}
-        <Button
-          variant="brandRecord"
-          leftIcon={<EditIcon />}
-          size="sm"
-          fontSize="sm"
-          onClick={onBulkOpen}
-          isDisabled={sequence.length === 0}
-        >
-          Edit All
-        </Button>
-        <Button
-          variant="brandWarning"
-          leftIcon={<DeleteIcon />}
-          size="sm"
-          fontSize="sm"
-          onClick={onOpen}
-          isDisabled={sequence.length === 0}
-        >
-          Clear All
-        </Button>
 
-        <Tooltip label="Simulate: play the macro virtually and see what it sends" hasArrow variant="brand">
-          <IconButton
+        {/* Secondary actions: icons only below the md breakpoint */}
+        <HStack spacing={1} flexShrink={0}>
+          {!timelineView && (
+            <Tooltip label="Add a delay" hasArrow variant="brand">
+              <IconButton
+                variant="brandRecord"
+                aria-label="Add delay"
+                icon={<TimeIcon />}
+                size="sm"
+                onClick={() => {
+                  onElementAdd({
+                    type: 'DelayEventAction',
+                    data: config.DefaultDelayValue
+                  })
+                }}
+              />
+            </Tooltip>
+          )}
+          <Tooltip label="Edit all elements: delays and durations at once" hasArrow variant="brand">
+            <Button
+              variant="brandRecord"
+              leftIcon={<EditIcon />}
+              iconSpacing={{ base: 0, md: 2 }}
+              size="sm"
+              fontSize="sm"
+              onClick={onBulkOpen}
+              isDisabled={sequence.length === 0}
+              aria-label="Edit all"
+            >
+              <Box as="span" display={{ base: 'none', md: 'inline' }}>
+                Edit All
+              </Box>
+            </Button>
+          </Tooltip>
+          <Tooltip label="Clear the whole sequence" hasArrow variant="brand">
+            <Button
+              variant="brandWarning"
+              leftIcon={<DeleteIcon />}
+              iconSpacing={{ base: 0, md: 2 }}
+              size="sm"
+              fontSize="sm"
+              onClick={onOpen}
+              isDisabled={sequence.length === 0}
+              aria-label="Clear all"
+            >
+              <Box as="span" display={{ base: 'none', md: 'inline' }}>
+                Clear All
+              </Box>
+            </Button>
+          </Tooltip>
+          <Tooltip label="Simulate: play the macro virtually and see what it sends" hasArrow variant="brand">
+            <IconButton
+              variant="brand"
+              aria-label="Simulate"
+              icon={<SimulateIcon />}
+              size="sm"
+              isActive={simulate}
+              onClick={() => {
+                setSimulate((value) => !value)
+                setPlayhead(null)
+              }}
+              isDisabled={sequence.length === 0}
+            />
+          </Tooltip>
+          <Tooltip
+            label="Macro settings: repeat count, hold threshold, tap mode"
+            hasArrow
             variant="brand"
-            aria-label="Simulate"
-            icon={<SimulateIcon />}
-            size="sm"
-            isActive={simulate}
-            onClick={() => {
-              setSimulate((value) => !value)
-              setPlayhead(null)
-            }}
-            isDisabled={sequence.length === 0}
-          />
-        </Tooltip>
-        <Tooltip
-          label="Macro settings: repeat count, hold threshold, tap mode"
-          hasArrow
-          variant="brand"
-        >
-          <IconButton
-            variant="brand"
-            aria-label="MacroSettings"
-            icon={<SettingsIcon />}
-            size="sm"
-            onClick={onOpenMacroSettingsModal}
-          />
-        </Tooltip>
+          >
+            <IconButton
+              variant="brand"
+              aria-label="MacroSettings"
+              icon={<SettingsIcon />}
+              size="sm"
+              onClick={onOpenMacroSettingsModal}
+            />
+          </Tooltip>
+        </HStack>
       </HStack>
       {/** Header End */}
       <BulkEditModal isOpen={isBulkOpen} onClose={onBulkClose} />
