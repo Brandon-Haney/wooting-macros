@@ -3,7 +3,6 @@ import {
   AccordionIcon,
   AccordionItem,
   AccordionPanel,
-  AspectRatio,
   Flex,
   SimpleGrid
 } from '@chakra-ui/react'
@@ -35,33 +34,23 @@ export default function MouseButtonsSection({ elementsToRender }: Props) {
         </AccordionButton>
       </h2>
       <AccordionPanel>
-        <SimpleGrid
-          h="fit"
-          columns={{
-            base: 2,
-            md: 3,
-            xl: 4
-          }}
-          px={4}
-          spacing={2}
-        >
+        <SimpleGrid h="fit" minChildWidth="96px" px={4} spacing={2}>
           {elementsToRender.map((info: MouseInputInfo) => (
-            <AspectRatio ratio={2 / 0.75} key={info.webButtonVal}>
-              <SelectElementButton
-                nameText={info.displayString}
-                properties={{
-                  type: 'MouseEventAction',
+            <SelectElementButton
+              key={info.webButtonVal}
+              nameText={info.displayString}
+              properties={{
+                type: 'MouseEventAction',
+                data: {
+                  type: 'Press',
                   data: {
-                    type: 'Press',
-                    data: {
-                      type: 'DownUp',
-                      button: info.enumVal,
-                      duration: DefaultMouseDelay
-                    }
+                    type: 'DownUp',
+                    button: info.enumVal,
+                    duration: DefaultMouseDelay
                   }
-                }}
-              />
-            </AspectRatio>
+                }
+              }}
+            />
           ))}
         </SimpleGrid>
       </AccordionPanel>

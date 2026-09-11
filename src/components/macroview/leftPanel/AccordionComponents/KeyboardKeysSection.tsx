@@ -45,11 +45,8 @@ export default function KeyboardKeysSection({ keyboardKeyCategories }: Props) {
               w="full"
               h="fit"
               px={4}
-              templateColumns={{
-                base: 'repeat(6, 1fr)',
-                md: 'repeat(8, 1fr)',
-                xl: 'repeat(10, 1fr)'
-              }}
+              // As many keycaps as fit at 46 px each; a label such as F10 never breaks mid-word.
+              templateColumns="repeat(auto-fill, minmax(46px, 1fr))"
               gap={2}
             >
               {category.elements.map((HIDinfo: HidInfo) => (

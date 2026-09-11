@@ -94,7 +94,7 @@ export default function SettingsModal({ isOpen, onClose }: Props) {
             sx={useScrollbarStyles()}
           >
             <ModalBody w="full" p={0}>
-              <VStack w="600px" justifyContent="left" spacing={4}>
+              <VStack w="full" maxW="600px" pr={6} justifyContent="left" spacing={4}>
                 <Text w="full" fontWeight="bold" fontSize="large">
                   {settingInfoLookup.get(pageIndex)?.displayString}
                 </Text>

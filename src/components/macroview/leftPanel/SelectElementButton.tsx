@@ -70,7 +70,9 @@ export default function SelectElementButton({
         h="full"
         as="button"
         bg={bg}
-        p={2}
+        px={1}
+        py={isKeycap ? 1 : 2}
+        minH={isKeycap ? undefined : '44px'}
         _hover={{ bg: hoverBg }}
         color={textColor}
         border="1px"
@@ -100,10 +102,12 @@ export default function SelectElementButton({
         <Text
           w="full"
           fontWeight="semibold"
-          fontSize={['sm', 'md', 'md']}
+          fontSize={isKeycap ? ['xs', 'sm', 'sm'] : ['xs', 'sm', 'md']}
+          lineHeight="short"
           cursor="pointer"
           overflowWrap="normal"
-          wordBreak="break-word"
+          wordBreak="normal"
+          whiteSpace={isKeycap && !nameText.includes(' ') ? 'nowrap' : 'normal'}
         >
           {nameText}
         </Text>
