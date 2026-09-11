@@ -66,6 +66,8 @@ const DRAG_THRESHOLD_PX = 3
 
 interface Props {
   recording: boolean
+  /** Simulation position within the iteration, drawn as a moving line. */
+  playhead?: number | null
 }
 
 type Drag =
@@ -94,7 +96,7 @@ interface Reselect {
  * iteration at `total`. Bars can be dragged, resized and drawn; every edit
  * is decompiled back into the sequence.
  */
-export default function Timeline({ recording }: Props) {
+export default function Timeline({ recording, playhead = null }: Props) {
   const {
     macro,
     sequence,
@@ -411,6 +413,7 @@ export default function Timeline({ recording }: Props) {
   const triggerColour = useColorModeValue('purple.500', 'purple.300')
   const endColour = useColorModeValue('primary-accent.600', 'primary-accent.400')
   const mutedText = useColorModeValue('gray.600', 'gray.400')
+  const playheadColour = useColorModeValue('green.500', 'green.300')
 
   const bracketLabel = useMemo(() => {
     const count = macro.repeat_count ?? null
@@ -617,6 +620,18 @@ export default function Timeline({ recording }: Props) {
                 }}
               />
             ))}
+            {playhead !== null && (
+              <Box
+                position="absolute"
+                left={`${LABEL_WIDTH + Math.min(playhead, view.total) * pxPerMs - 1}px`}
+                top={0}
+                h="full"
+                w="2px"
+                bg={playheadColour}
+                zIndex={2}
+                pointerEvents="none"
+              />
+            )}
             <Marker x={LABEL_WIDTH} colour={triggerColour} label="Trigger press" />
             <Marker
               x={LABEL_WIDTH + totalX}

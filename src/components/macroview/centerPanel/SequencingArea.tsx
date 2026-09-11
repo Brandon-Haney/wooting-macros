@@ -14,7 +14,7 @@ import {
   VStack
 } from '@chakra-ui/react'
 import { DeleteIcon, EditIcon, SettingsIcon, TimeIcon } from '@chakra-ui/icons'
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ActionEventType } from '../../../types'
 import { useMacroContext } from '../../../contexts/macroContext'
 import useRecordingSequence from '../../../hooks/useRecordingSequence'
@@ -26,7 +26,8 @@ import BulkEditModal from './BulkEditModal'
 import { RecordIcon, StopIcon } from '../../icons'
 import SortableList from './SortableList'
 import Timeline from './timeline/Timeline'
-import { ListIcon, TimelineIcon } from '../../icons'
+import SimulationPanel from './timeline/SimulationPanel'
+import { ListIcon, SimulateIcon, TimelineIcon } from '../../icons'
 import useMainBgColour from '../../../hooks/useMainBgColour'
 
 interface Props {
@@ -44,6 +45,8 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   } = useMacroContext()
   const { config, updateSequenceView } = useSettingsContext()
   const timelineView = config.SequenceView === 'Timeline'
+  const [simulate, setSimulate] = useState(false)
+  const [playhead, setPlayhead] = useState<number | null>(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const {
     isOpen: isBulkOpen,
@@ -187,6 +190,20 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
           Clear All
         </Button>
 
+        <Tooltip label="Simulate: play the macro virtually and see what it sends" hasArrow variant="brand">
+          <IconButton
+            variant="brand"
+            aria-label="Simulate"
+            icon={<SimulateIcon />}
+            size="sm"
+            isActive={simulate}
+            onClick={() => {
+              setSimulate((value) => !value)
+              setPlayhead(null)
+            }}
+            isDisabled={sequence.length === 0}
+          />
+        </Tooltip>
         <Tooltip
           label="Macro settings: repeat count, hold threshold, tap mode"
           hasArrow
@@ -210,9 +227,15 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
       />
       <Divider w="full" />
       {timelineView ? (
-        <Timeline recording={recording} />
+        <Timeline recording={recording} playhead={simulate ? playhead : null} />
       ) : (
         <SortableList recording={recording} stopRecording={stopRecording} />
+      )}
+      {simulate && sequence.length > 0 && (
+        <>
+          <Divider w="full" />
+          <SimulationPanel onPlayhead={setPlayhead} />
+        </>
       )}
     </VStack>
   )

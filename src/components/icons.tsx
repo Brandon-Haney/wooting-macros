@@ -57,3 +57,6 @@ export const ListIcon = (props: IconProps) => {
 export const TimelineIcon = (props: IconProps) => {
   return <Icon as={BsBarChartSteps} boxSize={4} {...props} />
 }
+export const SimulateIcon = (props: IconProps) => {
+  return <Icon as={HiPlay} boxSize={4} {...props} />
+}
