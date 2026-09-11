@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApplicationContext } from '../../../contexts/applicationContext'
 import { useMacroContext } from '../../../contexts/macroContext'
-import { useSelectedMacro } from '../../../contexts/selectors'
+import { useSelectedCollection, useSelectedMacro } from '../../../contexts/selectors'
 import EmojiPopover from '../../EmojiPopover'
 import TriggerArea from './TriggerArea'
 import TriggerModal from './TriggerModal'
@@ -36,6 +36,7 @@ export default function Header({ isEditing }: Props) {
     updateMacroIcon
   } = useMacroContext()
   const currentMacro = useSelectedMacro()
+  const currentCollection = useSelectedCollection()
   const [hasUserChangedIcon, setHasUserChangedIcon] = useState(false)
   const placeholderTextColour = useColorModeValue(
     'primary-light.300',
@@ -157,6 +158,7 @@ export default function Header({ isEditing }: Props) {
             onClick={onBackButtonPress}
           />
           <EmojiPopover
+            linkedProcesses={currentCollection.linked_processes ?? []}
             shortcodeToShow={macro.icon}
             isEmojiPopoverOpen={isEmojiPopoverOpen}
             onEmojiPopoverClose={onEmojiPopoverClose}

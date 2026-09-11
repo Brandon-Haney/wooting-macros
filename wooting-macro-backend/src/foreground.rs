@@ -57,6 +57,41 @@ fn is_helper_executable(file_name: &str) -> bool {
     HELPER_EXECUTABLES.iter().any(|helper| lower.contains(helper))
 }
 
+/// Full path of an executable name: a running process with that name, else a Steam game's
+/// executable. Used to fetch application icons; linked applications only store the name.
+pub fn application_path(exe: &str) -> Option<String> {
+    if let Some(path) = platform::running_process_path(exe) {
+        return Some(path);
+    }
+    for library in steam::library_folders() {
+        let steamapps = library.join("steamapps");
+        let Ok(dir) = std::fs::read_dir(&steamapps) else {
+            continue;
+        };
+        for manifest in dir.flatten() {
+            let path = manifest.path();
+            let is_manifest = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("appmanifest_") && name.ends_with(".acf"));
+            if !is_manifest {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let Some(install_dir) = steam::vdf_value(&text, "installdir") else {
+                continue;
+            };
+            let game_dir = steamapps.join("common").join(&install_dir);
+            if let Some(found) = steam::find_executable(&game_dir, exe, 0) {
+                return Some(found.to_string_lossy().to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Games installed through Steam, one entry per plausible executable, from every Steam library.
 pub fn steam_applications() -> Vec<ApplicationEntry> {
     let mut entries = Vec::new();
@@ -161,6 +196,32 @@ mod steam {
         }
 
         folders
+    }
+
+    /// Path of `exe` (case-insensitive file name) under `dir`, searching three levels deep.
+    pub fn find_executable(dir: &Path, exe: &str, depth: u8) -> Option<PathBuf> {
+        let entries = std::fs::read_dir(dir).ok()?;
+        let mut folders = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                folders.push(path);
+            } else if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.eq_ignore_ascii_case(exe))
+            {
+                return Some(path);
+            }
+        }
+        if depth < 3 {
+            for folder in folders {
+                if let Some(found) = find_executable(&folder, exe, depth + 1) {
+                    return Some(found);
+                }
+            }
+        }
+        None
     }
 
     /// Plausible game executables in an install folder: the top level, plus the layouts Unreal
@@ -342,6 +403,55 @@ mod platform {
         names
     }
 
+    /// Full path of the first running process whose executable name matches.
+    pub fn running_process_path(exe: &str) -> Option<String> {
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        // SAFETY: plain Win32 calls; every handle is closed before returning.
+        unsafe {
+            let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if snapshot == INVALID_HANDLE_VALUE {
+                return None;
+            }
+            let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+            entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+            let mut result = None;
+            if Process32FirstW(snapshot, &mut entry) != 0 {
+                loop {
+                    let length = entry
+                        .szExeFile
+                        .iter()
+                        .position(|c| *c == 0)
+                        .unwrap_or(entry.szExeFile.len());
+                    let name = String::from_utf16_lossy(&entry.szExeFile[..length]);
+                    if name.eq_ignore_ascii_case(exe) {
+                        let process =
+                            OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
+                        if process != 0 {
+                            let mut buffer = vec![0u16; 1024];
+                            let mut size = buffer.len() as u32;
+                            if QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut size)
+                                != 0
+                            {
+                                result = Some(String::from_utf16_lossy(&buffer[..size as usize]));
+                            }
+                            CloseHandle(process);
+                        }
+                        if result.is_some() {
+                            break;
+                        }
+                    }
+                    if Process32NextW(snapshot, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+            CloseHandle(snapshot);
+            result
+        }
+    }
+
     /// Running programs that own a visible top-level window, keyed by executable, with the
     /// window title as label. Programs without a window are listed as `background`.
     pub fn running_applications() -> Vec<ApplicationEntry> {
@@ -428,6 +538,10 @@ mod platform {
 
     pub fn running_applications() -> Vec<ApplicationEntry> {
         Vec::new()
+    }
+
+    pub fn running_process_path(_exe: &str) -> Option<String> {
+        None
     }
 
     pub fn request_fine_timer_resolution() {}

@@ -35,6 +35,7 @@ use crate::plugin::system_event;
 
 pub mod config;
 pub mod foreground;
+pub mod icons;
 mod hid_table;
 pub mod plugin;
 

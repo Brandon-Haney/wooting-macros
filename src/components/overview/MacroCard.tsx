@@ -1,3 +1,4 @@
+import AppIcon from '../AppIcon'
 import {
   Box,
   Button,
@@ -135,7 +136,7 @@ export default function MacroCard({
             cursor="default"
             opacity={macro.active ? 1 : 0.5}
           >
-            <em-emoji shortcodes={macro.icon} size="32px" />
+            <AppIcon icon={macro.icon} />
           </Box>
           <Text
             textStyle="name"

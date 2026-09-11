@@ -84,6 +84,26 @@ async fn list_processes() -> Result<Vec<String>, ()> {
 }
 
 #[tauri::command]
+/// PNG data URL of the icon of an executable, .ico or .png file.
+async fn get_file_icon(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || icons::icon_data_url(&path))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// PNG data URL of the icon of an application known by executable name (running or a Steam
+/// game), or None when it cannot be found.
+async fn get_application_icon(exe: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        foreground::application_path(&exe).and_then(|path| icons::icon_data_url(&path).ok())
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 /// Plays a macro's sequence once, for the editor's test pad.
 async fn run_macro(state: tauri::State<'_, MacroBackend>, macros: Macro) -> Result<(), String> {
     state.run_macro(macros).map_err(|e| e.to_string())
@@ -382,7 +402,9 @@ async fn main() -> Result<(), Error> {
             list_processes,
             list_applications,
             get_status,
-            run_macro
+            run_macro,
+            get_file_icon,
+            get_application_icon
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;

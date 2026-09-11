@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from 'react'
+import { invoke } from '@tauri-apps/api'
+import { isImageIcon } from '../AppIcon'
 import { useApplicationContext } from '../../contexts/applicationContext'
 import { useSelectedCollection } from '../../contexts/selectors'
 import ApplicationPickerModal from '../ApplicationPickerModal'
@@ -23,8 +25,18 @@ export default function LinkedAppsModal({ isOpen, onClose }: Props) {
         { ...currentCollection, linked_processes },
         selection.collectionIndex
       )
+      // The first linked application gives a collection that still has the default emoji its icon.
+      const firstLink = linked.length === 0 && linked_processes.length > 0
+      if (firstLink && !isImageIcon(currentCollection.icon) && currentCollection.icon === ':package:') {
+        const index = selection.collectionIndex
+        invoke<string | null>('get_application_icon', { exe: linked_processes[0] })
+          .then((icon) => {
+            if (icon) onCollectionUpdate({ ...currentCollection, linked_processes, icon }, index)
+          })
+          .catch(() => undefined)
+      }
     },
-    [currentCollection, onCollectionUpdate, selection.collectionIndex]
+    [currentCollection, linked, onCollectionUpdate, selection.collectionIndex]
   )
 
   return (

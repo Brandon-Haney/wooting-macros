@@ -1,3 +1,4 @@
+import AppIcon from '../AppIcon'
 import {
   Badge,
   Box,
@@ -60,7 +61,7 @@ export default function CollectionButton({
           onClick={() => setFocus(index)}
         ></Box>
         <Box maxHeight="32px" m={0}>
-          <em-emoji shortcodes={collection.icon} size="32px" />
+          <AppIcon icon={collection.icon} />
         </Box>
         <Text
           w="full"

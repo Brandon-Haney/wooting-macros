@@ -97,6 +97,9 @@ function answer(message: Message): unknown {
       return { hook_healthy: true, is_listening: true, foreground_process: 'preview.exe' }
     case 'run_macro':
       return undefined
+    case 'get_file_icon':
+    case 'get_application_icon':
+      return null
     case 'is_debug':
       return true
     case 'list_processes':

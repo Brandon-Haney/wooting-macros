@@ -197,6 +197,7 @@ export default function CollectionPanel({ searchValue }: Props) {
           <HStack w="full" justifyContent="space-between" flexWrap="wrap" rowGap={2}>
             <HStack flex={1} minW="240px" spacing={4}>
               <EmojiPopover
+                linkedProcesses={currentCollection.linked_processes ?? []}
                 shortcodeToShow={currentCollection.icon}
                 isEmojiPopoverOpen={isEmojiPopoverOpen}
                 onEmojiPopoverClose={onEmojiPopoverClose}
