@@ -46,6 +46,7 @@ export default function SortableWrapper({ id, isSmall, children }: Props) {
     <HStack
       ref={setNodeRef}
       style={style}
+      data-sortable-item
       {...attributes}
       w={isSmall ? 'fit-content' : 'full'}
       rounded='md'
