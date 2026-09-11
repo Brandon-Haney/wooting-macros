@@ -1,7 +1,7 @@
 import { Icon, IconProps } from '@chakra-ui/react'
 import { SiDiscord, SiGithub } from 'react-icons/si'
 import { RxKeyboard } from 'react-icons/rx'
-import { BsMouse2, BsThreeDotsVertical } from 'react-icons/bs'
+import { BsBarChartSteps, BsListUl, BsMouse2, BsThreeDotsVertical } from 'react-icons/bs'
 import { SlScreenDesktop } from 'react-icons/sl'
 import {
   HiArrowDown,
@@ -50,4 +50,10 @@ export const RecordIcon = (props: IconProps) => {
 }
 export const ResetDefaultIcon = (props: IconProps) => {
   return <Icon as={RepeatClockIcon} boxSize={5} {...props} />
+}
+export const ListIcon = (props: IconProps) => {
+  return <Icon as={BsListUl} boxSize={4} {...props} />
+}
+export const TimelineIcon = (props: IconProps) => {
+  return <Icon as={BsBarChartSteps} boxSize={4} {...props} />
 }

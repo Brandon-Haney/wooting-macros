@@ -65,6 +65,7 @@ export type SettingsState = {
   updateMinimizeOnClose: (value: boolean) => void
   updatePauseHotkey: (keys: number[]) => void
   updateRecordFixedTimings: (value: boolean) => void
+  updateSequenceView: (value: SequenceView) => void
   updateAutoAddDelay: (value: boolean) => void
   updateDefaultDelayVal: (value: string) => void
   updateAutoSelectElement: (value: boolean) => void
@@ -115,7 +116,11 @@ export interface ApplicationConfig {
   PauseHotkey?: number[]
   /** Recording uses the default delay for delays and press durations instead of measured times. */
   RecordFixedTimings?: boolean
+  /** How the editor shows the sequence. */
+  SequenceView?: SequenceView
 }
+
+export type SequenceView = 'List' | 'Timeline'
 
 /** What a quick tap of an OnHold macro's trigger does, see the backend TapMode. */
 export type TapMode = 'DeferredTap' | 'PassThrough'

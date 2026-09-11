@@ -187,6 +187,7 @@ impl Default for ApplicationConfig {
             minimize_to_tray: true,
             pause_hotkey: Vec::new(),
             record_fixed_timings: false,
+            sequence_view: default_sequence_view(),
         }
     }
 }
@@ -228,6 +229,13 @@ pub struct ApplicationConfig {
     /// duration instead of the measured timings.
     #[serde(default)]
     pub record_fixed_timings: bool,
+    /// How the macro editor shows the sequence: "List" or "Timeline".
+    #[serde(default = "default_sequence_view")]
+    pub sequence_view: String,
+}
+
+fn default_sequence_view() -> String {
+    "List".to_string()
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
 #[serde(rename_all = "PascalCase")]

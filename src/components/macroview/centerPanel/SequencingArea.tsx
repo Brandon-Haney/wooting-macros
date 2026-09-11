@@ -3,6 +3,7 @@ import {
   AlertDescription,
   AlertIcon,
   Button,
+  ButtonGroup,
   Divider,
   HStack,
   IconButton,
@@ -24,6 +25,8 @@ import ClearSequenceModal from './ClearSequenceModal'
 import BulkEditModal from './BulkEditModal'
 import { RecordIcon, StopIcon } from '../../icons'
 import SortableList from './SortableList'
+import Timeline from './timeline/Timeline'
+import { ListIcon, TimelineIcon } from '../../icons'
 import useMainBgColour from '../../../hooks/useMainBgColour'
 
 interface Props {
@@ -39,7 +42,8 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
     overwriteSequence,
     updateSelectedElementId
   } = useMacroContext()
-  const { config } = useSettingsContext()
+  const { config, updateSequenceView } = useSettingsContext()
+  const timelineView = config.SequenceView === 'Timeline'
   const { isOpen, onOpen, onClose } = useDisclosure()
   const {
     isOpen: isBulkOpen,
@@ -114,6 +118,28 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         <Text fontWeight="semibold" fontSize={['sm', 'md']}>
           Sequence
         </Text>
+        <ButtonGroup size="sm" isAttached variant="brandRecord">
+          <Tooltip label="Elements as a list" hasArrow variant="brand">
+            <Button
+              leftIcon={<ListIcon />}
+              fontSize="sm"
+              isActive={!timelineView}
+              onClick={() => updateSequenceView('List')}
+            >
+              List
+            </Button>
+          </Tooltip>
+          <Tooltip label="Presses on a per-key timeline" hasArrow variant="brand">
+            <Button
+              leftIcon={<TimelineIcon />}
+              fontSize="sm"
+              isActive={timelineView}
+              onClick={() => updateSequenceView('Timeline')}
+            >
+              Timeline
+            </Button>
+          </Tooltip>
+        </ButtonGroup>
         <Button
           variant="brandRecord"
           leftIcon={recording ? <StopIcon /> : <RecordIcon />}
@@ -124,20 +150,22 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         >
           {recording ? 'Stop' : 'Record'}
         </Button>
-        <Button
-          variant="brandRecord"
-          leftIcon={<TimeIcon />}
-          size="sm"
-          fontSize="sm"
-          onClick={() => {
-            onElementAdd({
-              type: 'DelayEventAction',
-              data: config.DefaultDelayValue
-            })
-          }}
-        >
-          Add Delay
-        </Button>
+        {!timelineView && (
+          <Button
+            variant="brandRecord"
+            leftIcon={<TimeIcon />}
+            size="sm"
+            fontSize="sm"
+            onClick={() => {
+              onElementAdd({
+                type: 'DelayEventAction',
+                data: config.DefaultDelayValue
+              })
+            }}
+          >
+            Add Delay
+          </Button>
+        )}
         <Button
           variant="brandRecord"
           leftIcon={<EditIcon />}
@@ -181,7 +209,11 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         stopRecording={stopRecording}
       />
       <Divider w="full" />
-      <SortableList recording={recording} stopRecording={stopRecording} />
+      {timelineView ? (
+        <Timeline recording={recording} />
+      ) : (
+        <SortableList recording={recording} stopRecording={stopRecording} />
+      )}
     </VStack>
   )
 }

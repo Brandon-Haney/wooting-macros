@@ -9,7 +9,7 @@ import {
   useMemo,
   useState
 } from 'react'
-import { ApplicationConfig, SettingsState } from '../types'
+import { ApplicationConfig, SequenceView, SettingsState } from '../types'
 import { error } from 'tauri-plugin-log'
 import { DefaultDelayDelay } from "../constants";
 import { updateSettings } from "../constants/utils";
@@ -37,7 +37,8 @@ function SettingsProvider({ children }: SettingsProviderProps) {
     Theme: 'light',
     MinimizeToTray: true,
     PauseHotkey: [],
-    RecordFixedTimings: false
+    RecordFixedTimings: false,
+    SequenceView: 'List'
   })
   const toast = useToast()
 
@@ -113,6 +114,11 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       return { ...config, RecordFixedTimings: value }
     })
   }, [])
+  const updateSequenceView = useCallback((value: SequenceView) => {
+    setConfig((config) => {
+      return { ...config, SequenceView: value }
+    })
+  }, [])
   const updateTheme = useCallback(
     (value: string) => {
       setConfig((config) => {
@@ -134,6 +140,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateAutoSelectElement,
       updatePauseHotkey,
       updateRecordFixedTimings,
+      updateSequenceView,
       updateTheme
     }),
     [
@@ -146,6 +153,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateAutoSelectElement,
       updatePauseHotkey,
       updateRecordFixedTimings,
+      updateSequenceView,
       updateTheme
     ]
   )
