@@ -1,93 +1,132 @@
-import { useCallback, useEffect, useState } from 'react'
-import { KeyType, MouseButton } from '../constants/enums'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { MouseButton } from '../constants/enums'
 import {
   webCodeLocationHidEncode,
   webCodeLocationHIDLookup
 } from '../constants/HIDmap'
 import { webButtonLookup } from '../constants/MouseMap'
-import { Keypress, MousePressAction } from '../types'
 import { error } from 'tauri-plugin-log'
 import { useToast } from '@chakra-ui/react'
 import { invoke } from '@tauri-apps/api'
+import { Bar, keyTrack, mouseTrack, Schedule } from '../utils/schedule'
 
+interface Options {
+  /** Every press and gap takes this many ms instead of the measured time. */
+  fixedStepMs?: number
+}
+
+/**
+ * Records keys and mouse buttons pressed while the window is focused into a
+ * schedule: one bar per press, overlaps kept. `onChange` receives the
+ * schedule after every event (bars still held are open-ended) so the
+ * sequence can be shown live; the first event is at t = 0.
+ */
 export default function useRecordingSequence(
-  onItemChanged: (
-    item: Keypress | MousePressAction | undefined,
-    prevItem: Keypress | MousePressAction | undefined,
-    timeDiff: number,
-    isUpEvent: boolean
-  ) => void
+  onChange: (schedule: Schedule) => void,
+  { fixedStepMs }: Options = {}
 ) {
   const [recording, setRecording] = useState(false)
-  const [item, setItem] = useState<Keypress | MousePressAction | undefined>(
-    undefined
-  )
-  const [prevItem, setPrevItem] = useState<
-    Keypress | MousePressAction | undefined
-  >(undefined)
-
   const toast = useToast()
-
-  const [eventType, setEventType] = useState<'Down' | 'Up'>('Down')
-  const [prevEventType, setPrevEventType] = useState<'Down' | 'Up'>('Down')
-
-  const [prevTimestamp, setPrevTimestamp] = useState(0)
+  const bars = useRef<Bar[]>([])
+  const open = useRef(new Map<string, Bar>())
+  const origin = useRef<number | undefined>(undefined)
+  const events = useRef(0)
 
   const startRecording = useCallback(() => {
-    setItem(undefined)
-    setPrevItem(undefined)
+    bars.current = []
+    open.current = new Map()
+    origin.current = undefined
+    events.current = 0
     setRecording(true)
-  }, [setItem, setRecording])
+  }, [])
 
   const stopRecording = useCallback(() => {
     setRecording(false)
-  }, [setRecording])
+  }, [])
+
+  const publish = useCallback(
+    (now: number) => {
+      const tracks = new Map<string, Bar['track']>()
+      for (const bar of bars.current) tracks.set(bar.track, bar.track)
+      const schedule: Schedule = {
+        tracks: [...tracks.keys()].map((id) => ({
+          id,
+          kind: id.startsWith('k:') ? 'key' : 'mouse',
+          code: Number(id.slice(2))
+        })),
+        bars: bars.current.map((bar) =>
+          bar.openEnd ? { ...bar, end: now } : bar
+        ),
+        instants: [],
+        total: now
+      }
+      onChange(schedule)
+    },
+    [onChange]
+  )
+
+  const record = useCallback(
+    (track: string, isUp: boolean, timeStamp: number) => {
+      let at: number
+      if (fixedStepMs !== undefined) {
+        at = events.current * fixedStepMs
+      } else {
+        if (origin.current === undefined) origin.current = timeStamp
+        at = Math.round(timeStamp - origin.current)
+      }
+      events.current += 1
+
+      if (isUp) {
+        const bar = open.current.get(track)
+        if (bar) {
+          bar.end = at
+          bar.openEnd = false
+          open.current.delete(track)
+        } else {
+          bars.current.push({
+            id: `r${bars.current.length}`,
+            track,
+            start: 0,
+            end: at,
+            openEnd: false,
+            openStart: true,
+            source: []
+          })
+        }
+      } else if (!open.current.has(track)) {
+        const bar: Bar = {
+          id: `r${bars.current.length}`,
+          track,
+          start: at,
+          end: at,
+          openEnd: true,
+          openStart: false,
+          source: []
+        }
+        bars.current.push(bar)
+        open.current.set(track, bar)
+      }
+      publish(at)
+    },
+    [fixedStepMs, publish]
+  )
 
   const addKeypress = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault()
       event.stopPropagation()
+      if (event.repeat) return
 
-      if (event.repeat) {
-        return
-      }
       const HIDIdentifier = webCodeLocationHidEncode(
         event.which,
         event.location
       )
-
       const HIDcode = webCodeLocationHIDLookup.get(HIDIdentifier)?.HIDcode
-      if (HIDcode === undefined) {
-        return
-      }
-      const timeDiff = Math.round(event.timeStamp - prevTimestamp)
+      if (HIDcode === undefined) return
 
-      setPrevTimestamp(event.timeStamp)
-      setPrevEventType(eventType)
-      setPrevItem(item)
-
-      if (event.type === 'keyup') {
-        setEventType('Up')
-        const keyup: Keypress = {
-          keypress: HIDcode,
-          press_duration: 0,
-          keytype: KeyType[KeyType.Up]
-        }
-        setItem(keyup)
-        onItemChanged(keyup, item, timeDiff, true)
-        return
-      }
-
-      setEventType('Down')
-      const keydown: Keypress = {
-        keypress: HIDcode,
-        press_duration: 0,
-        keytype: KeyType[KeyType.Down]
-      }
-      setItem(keydown)
-      onItemChanged(keydown, item, timeDiff, false)
+      record(keyTrack(HIDcode), event.type === 'keyup', event.timeStamp)
     },
-    [eventType, item, onItemChanged, prevTimestamp]
+    [record]
   )
 
   const addMousepress = useCallback(
@@ -95,20 +134,19 @@ export default function useRecordingSequence(
       event.preventDefault()
       event.stopPropagation()
 
+      const target = event.target as HTMLElement
       if (
-        (event.target as HTMLElement).localName === 'button' ||
-        (event.target as HTMLElement).localName === 'svg' ||
-        (event.target as HTMLElement).localName === 'path'
+        target.localName === 'button' ||
+        target.localName === 'svg' ||
+        target.localName === 'path'
       ) {
         return
       }
 
       const enumVal = webButtonLookup.get(event.button)?.enumVal
-      if (enumVal === undefined) {
-        return
-      }
+      if (enumVal === undefined) return
 
-      // We want to stop the recording when the left mouse button is pressed. Currently, always stops the recording
+      // Left click stops the recording so the UI stays usable.
       if (enumVal === MouseButton.Left) {
         toast({
           title: `Sequence recording stopped`,
@@ -121,38 +159,13 @@ export default function useRecordingSequence(
         return
       }
 
-      const timeDiff = Math.round(event.timeStamp - prevTimestamp)
-      setPrevTimestamp(event.timeStamp)
-      setPrevEventType(eventType)
-      setPrevItem(item)
-
-      if (event.type === 'mouseup') {
-        setEventType('Up')
-        const mouseup: MousePressAction = {
-          type: 'Up',
-          button: enumVal
-        }
-        setItem(mouseup)
-        onItemChanged(mouseup, item, timeDiff, true)
-        return
-      }
-
-      setEventType('Down')
-      const mousedown: MousePressAction = {
-        type: 'Down',
-        button: enumVal
-      }
-
-      setItem(mousedown)
-      onItemChanged(mousedown, item, timeDiff, false)
+      record(mouseTrack(enumVal), event.type === 'mouseup', event.timeStamp)
     },
-    [eventType, item, onItemChanged, prevTimestamp]
+    [record, toast]
   )
 
   useEffect(() => {
-    if (!recording) {
-      return
-    }
+    if (!recording) return
 
     window.addEventListener('keydown', addKeypress, false)
     window.addEventListener('mousedown', addMousepress, false)
@@ -177,13 +190,5 @@ export default function useRecordingSequence(
     }
   }, [recording, addKeypress, addMousepress])
 
-  return {
-    recording,
-    startRecording,
-    stopRecording,
-    item,
-    eventType,
-    prevEventType,
-    prevItem
-  }
+  return { recording, startRecording, stopRecording }
 }

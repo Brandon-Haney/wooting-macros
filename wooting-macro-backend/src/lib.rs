@@ -248,9 +248,9 @@ impl Macro {
                     task::spawn(async move { action_copy.execute(channel_copy).await });
                 }
                 ActionEventType::MouseEventAction { data } => {
-                    let action_copy = data.clone();
-                    let channel_copy = send_channel.clone();
-                    task::spawn(async move { action_copy.execute(channel_copy).await });
+                    // Awaited like a key press so a timed mouse press holds up the
+                    // sequence; the timeline view relies on that.
+                    data.execute(send_channel.clone()).await?;
                 }
             }
         }

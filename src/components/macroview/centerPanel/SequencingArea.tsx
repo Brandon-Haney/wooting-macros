@@ -13,13 +13,13 @@ import {
   VStack
 } from '@chakra-ui/react'
 import { DeleteIcon, EditIcon, SettingsIcon, TimeIcon } from '@chakra-ui/icons'
-import { useCallback } from 'react'
-import { Keypress, MousePressAction } from '../../../types'
+import { useCallback, useRef } from 'react'
+import { ActionEventType } from '../../../types'
 import { useMacroContext } from '../../../contexts/macroContext'
 import useRecordingSequence from '../../../hooks/useRecordingSequence'
 import { useSettingsContext } from '../../../contexts/settingsContext'
-import { KeyType } from '../../../constants/enums'
-import { checkIfKeypress, checkIfMouseButton } from '../../../constants/utils'
+import { checkIfElementIsEditable } from '../../../constants/utils'
+import { decompile, Schedule } from '../../../utils/schedule'
 import ClearSequenceModal from './ClearSequenceModal'
 import BulkEditModal from './BulkEditModal'
 import { RecordIcon, StopIcon } from '../../icons'
@@ -33,10 +33,11 @@ interface Props {
 export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   const {
     sequence,
+    ids,
     willCauseTriggerLooping,
     onElementAdd,
-    onElementsAdd,
-    updateElement
+    overwriteSequence,
+    updateSelectedElementId
   } = useMacroContext()
   const { config } = useSettingsContext()
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -46,104 +47,32 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
     onClose: onBulkClose
   } = useDisclosure()
 
-  const onItemChanged = useCallback(
-    (
-      item: Keypress | MousePressAction | undefined,
-      prevItem: Keypress | MousePressAction | undefined,
-      timeDiff: number,
-      isUpEvent: boolean
-    ) => {
-      if (item === undefined) {
-        return
-      }
-      // Fixed timings: ignore how long the user waited or held the key.
-      if (config.RecordFixedTimings) {
-        timeDiff = config.DefaultDelayValue
-      }
-      // If necessary, adjust previous element.
-      if (isUpEvent && prevItem !== undefined) {
-        if (checkIfKeypress(prevItem) && checkIfKeypress(item)) {
-          if (prevItem.keypress === item.keypress) {
-            updateElement(
-              {
-                type: 'KeyPressEventAction',
-                data: {
-                  ...prevItem,
-                  keytype: KeyType[KeyType.DownUp],
-                  press_duration: timeDiff
-                }
-              },
-              sequence.length - 1
-            )
-            return
-          }
-        } else if (checkIfMouseButton(prevItem) && checkIfMouseButton(item)) {
-          if (prevItem.button === item.button) {
-            updateElement(
-              {
-                type: 'MouseEventAction',
-                data: {
-                  type: 'Press',
-                  data: { ...prevItem, type: 'DownUp', duration: timeDiff }
-                }
-              },
-              sequence.length - 1
-            )
-            return
-          }
-        }
-      }
-      // Add elements to the sequence. If there is no previous item, the item we are adding is the first one, thus we do not include a delay element.
-      if (prevItem === undefined) {
-        if (checkIfKeypress(item)) {
-          onElementAdd({
-            type: 'KeyPressEventAction',
-            data: item
-          })
-        } else {
-          onElementAdd({
-            type: 'MouseEventAction',
-            data: { type: 'Press', data: item }
-          })
-        }
+  // The sequence as it was when recording started; recorded events are
+  // appended to it after every key so the list updates live.
+  const base = useRef<ActionEventType[]>([])
+
+  const onRecorded = useCallback(
+    (recorded: Schedule) => {
+      const next = [...base.current, ...decompile(recorded)]
+      overwriteSequence(next)
+      const last = next[next.length - 1]
+      if (config.AutoSelectElement && last && checkIfElementIsEditable(last)) {
+        updateSelectedElementId(next.length - 1)
       } else {
-        if (checkIfKeypress(item)) {
-          onElementsAdd([
-            {
-              type: 'DelayEventAction',
-              data: timeDiff
-            },
-            {
-              type: 'KeyPressEventAction',
-              data: item
-            }
-          ])
-        } else {
-          onElementsAdd([
-            {
-              type: 'DelayEventAction',
-              data: timeDiff
-            },
-            {
-              type: 'MouseEventAction',
-              data: { type: 'Press', data: item }
-            }
-          ])
-        }
+        updateSelectedElementId(undefined)
       }
     },
-    [
-      config.DefaultDelayValue,
-      config.RecordFixedTimings,
-      onElementAdd,
-      onElementsAdd,
-      sequence.length,
-      updateElement
-    ]
+    [config.AutoSelectElement, overwriteSequence, updateSelectedElementId]
   )
 
-  const { recording, startRecording, stopRecording } =
-    useRecordingSequence(onItemChanged)
+  const recorder = useRecordingSequence(onRecorded, {
+    fixedStepMs: config.RecordFixedTimings ? config.DefaultDelayValue : undefined
+  })
+  const { recording, stopRecording } = recorder
+  const startRecording = useCallback(() => {
+    base.current = ids.map((id) => sequence[id - 1]).filter(Boolean)
+    recorder.startRecording()
+  }, [ids, recorder, sequence])
 
   return (
     <VStack w="41%" h="full" bg={useMainBgColour()} justifyContent="top">
