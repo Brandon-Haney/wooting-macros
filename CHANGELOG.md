@@ -4,7 +4,12 @@ All notable changes to this fork. Versions are git tags; each tag is built and p
 
 ## Unreleased
 
-Nothing yet.
+### Added
+- Timeline: click a row label to select every press on that row (Ctrl adds rows); right-click a bar for Duplicate, Select all on this row, Move to another key and Delete; right-click a row label for Select row, Change key and Delete row. Change key remaps every press on the row through a searchable key picker.
+- The right panel has a Delete button for the selected element and, when several are selected on the timeline, a summary with Delete all and Clear selection.
+
+### Fixed
+- Palette keycaps fit at the minimum window width (labels no longer break mid-word); the settings dialog content is fluid.
 
 ## 1.3.0 — 2026-09-11
 
