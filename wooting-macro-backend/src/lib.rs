@@ -135,6 +135,24 @@ pub struct Macro {
     /// loops before it stops on its own (default: until triggered again). Ignored by `OnHold`.
     #[serde(default)]
     pub repeat_count: Option<u32>,
+    /// Executable names (`game.exe`, case-insensitive). When not empty the macro only fires
+    /// while one of them owns the foreground window, on top of its collection being active.
+    #[serde(default)]
+    pub linked_processes: Vec<String>,
+}
+
+impl Macro {
+    /// Whether this macro may fire with the given application in the foreground.
+    fn allowed_in_foreground(&self, process: Option<&str>) -> bool {
+        if self.linked_processes.is_empty() {
+            return true;
+        }
+        process.is_some_and(|process| {
+            self.linked_processes
+                .iter()
+                .any(|linked| linked.trim().eq_ignore_ascii_case(process))
+        })
+    }
 }
 
 /// Deepest chain of macros calling macros that is followed before giving up.
@@ -387,6 +405,8 @@ pub enum BackendCommand {
         name: String,
         mode: system_event::CollectionMode,
     },
+    /// A macro started executing (for activity feedback in the UI).
+    MacroFired { name: String },
 }
 
 /// Everything the grab hook needs to start, stop and keep track of macro executions.
@@ -398,12 +418,31 @@ struct ExecutionContext {
     library: Arc<RwLock<MacroData>>,
     /// Requests for the backend host, see `BackendCommand`.
     commands: UnboundedSender<BackendCommand>,
+    /// Executable name of the application owning the foreground window, as last reported.
+    foreground: Arc<Mutex<Option<String>>>,
+    /// Whether the hook thread answered the last supervisor check.
+    hook_healthy: Arc<AtomicBool>,
     running: RunningMacros,
     injected: InjectedEvents,
     is_listening: Arc<AtomicBool>,
     /// Counts every event the grab hook has seen, injected ones included. Looping macros use it
     /// as a liveness signal for the hook.
     hook_events: Arc<AtomicU64>,
+}
+
+/// A snapshot of the backend's health for the UI.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BackendStatus {
+    /// The hook thread answered the last supervisor check (always true before the first check).
+    pub hook_healthy: bool,
+    /// Events seen by the hook since start.
+    pub hook_events: u64,
+    /// Times the hook was re-installed.
+    pub rehooks: u64,
+    /// Executable name of the application owning the foreground window.
+    pub foreground: Option<String>,
+    /// Whether macros are processed at all (Disable Macro Output flips this).
+    pub listening: bool,
 }
 
 /// State of the application in RAM (RWlock).
@@ -419,6 +458,8 @@ pub struct MacroBackend {
     command_sender: UnboundedSender<BackendCommand>,
     /// Taken once by the host with `take_command_receiver`.
     command_receiver: Mutex<Option<UnboundedReceiver<BackendCommand>>>,
+    hook_events: Arc<AtomicU64>,
+    hook_healthy: Arc<AtomicBool>,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -1049,6 +1090,18 @@ fn check_macro_execution_efficiently(
             continue;
         }
 
+        // A macro scoped to applications stays inert (and lets the key through) elsewhere.
+        if !macros.linked_processes.is_empty() {
+            let foreground = lock_or_recover(&context.foreground).clone();
+            if !macros.allowed_in_foreground(foreground.as_deref()) {
+                trace!(
+                    "Macro {:?} is scoped to {:?}, foreground is {:?}: ignoring",
+                    macros.name, macros.linked_processes, foreground
+                );
+                continue;
+            }
+        }
+
         debug!("MATCHED MACRO {:?}: {:#?}", macros.macro_type, pressed_events);
 
         // A gated on-hold macro in pass-through mode lets the physical press reach the OS.
@@ -1069,6 +1122,9 @@ fn check_macro_execution_efficiently(
             lift_trigger_modifiers(macros, context);
         }
 
+        let _ = context.commands.send(BackendCommand::MacroFired {
+            name: macros.name.clone(),
+        });
         execute_macro(macros.clone(), context);
     }
 
@@ -1160,6 +1216,17 @@ impl MacroBackend {
         lock_or_recover(&self.command_receiver).take()
     }
 
+    /// Health snapshot for the UI.
+    pub fn status(&self) -> BackendStatus {
+        BackendStatus {
+            hook_healthy: self.hook_healthy.load(Ordering::Relaxed),
+            hook_events: self.hook_events.load(Ordering::Relaxed),
+            rehooks: rdev::rehook_count(),
+            foreground: lock_or_recover(&self.foreground).clone(),
+            listening: self.is_listening.load(Ordering::Relaxed),
+        }
+    }
+
     /// Enables, disables or toggles a collection on behalf of a macro. Returns the data if the
     /// state changed, so the frontend can be told.
     pub async fn set_collection_active(
@@ -1227,7 +1294,9 @@ impl MacroBackend {
             running: self.running.clone(),
             injected: InjectedEvents::default(),
             is_listening: self.is_listening.clone(),
-            hook_events: Arc::new(AtomicU64::new(0)),
+            foreground: self.foreground.clone(),
+            hook_healthy: self.hook_healthy.clone(),
+            hook_events: self.hook_events.clone(),
         };
 
         // Create the executor
@@ -1285,9 +1354,11 @@ fn spawn_hook_supervisor(context: ExecutionContext, triggers: Arc<RwLock<MacroTr
 
             if !requested || rdev::rehook_count() == before {
                 warn!("The input hook thread is not responding, starting a new one");
+                context.hook_healthy.store(false, Ordering::Relaxed);
                 rdev::unhook();
                 spawn_grab_thread(&context, &triggers);
             } else {
+                context.hook_healthy.store(true, Ordering::Relaxed);
                 debug!("Input hook re-installed");
             }
         }
@@ -1500,6 +1571,8 @@ impl Default for MacroBackend {
             foreground: Arc::new(Mutex::new(None)),
             command_sender,
             command_receiver: Mutex::new(Some(command_receiver)),
+            hook_events: Arc::new(AtomicU64::new(0)),
+            hook_healthy: Arc::new(AtomicBool::new(true)),
         }
     }
 }

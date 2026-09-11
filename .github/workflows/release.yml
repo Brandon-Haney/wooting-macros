@@ -1,0 +1,52 @@
+name: release
+
+# Builds the Windows installers and publishes a GitHub Release (with the updater manifest)
+# whenever a version tag is pushed: `git tag v1.2.0 && git push origin v1.2.0`.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable corepack (yarn 3)
+        run: corepack enable
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri
+            wooting-macro-backend
+
+      - name: Install frontend dependencies
+        run: yarn install --immutable
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Wootomation ${{ github.ref_name }}'
+          releaseBody: 'See docs/ROADMAP.md for what changed. Installers: the .exe is a per-user install (no admin), the .msi is per-machine.'
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

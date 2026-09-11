@@ -54,6 +54,9 @@ async fn get_macros(state: tauri::State<'_, MacroBackend>) -> Result<MacroData, 
 /// collection was armed or disarmed).
 const MACRO_DATA_UPDATED_EVENT: &str = "macro-data-updated";
 
+/// Event carrying the name of a macro that just started executing.
+const MACRO_FIRED_EVENT: &str = "macro-fired";
+
 #[tauri::command]
 /// Sets the configuration from frontend and updates the state for everything on backend.
 async fn set_macros(
@@ -70,6 +73,7 @@ async fn set_macros(
         app.emit_all(MACRO_DATA_UPDATED_EVENT, data)
             .map_err(|err| err.to_string())?;
     }
+    refresh_tray_menu(&app).await;
     Ok(())
 }
 
@@ -77,6 +81,12 @@ async fn set_macros(
 /// Executable names of the running processes, for linking collections to applications.
 async fn list_processes() -> Result<Vec<String>, ()> {
     Ok(foreground::running_process_names())
+}
+
+#[tauri::command]
+/// Health snapshot for the status bar.
+async fn get_status(state: tauri::State<'_, MacroBackend>) -> Result<BackendStatus, ()> {
+    Ok(state.status())
 }
 
 #[tauri::command]
@@ -104,12 +114,19 @@ fn spawn_command_processor(app: tauri::AppHandle) {
                 BackendCommand::SetCollectionActive { name, mode } => {
                     backend.set_collection_active(&name, mode).await
                 }
+                BackendCommand::MacroFired { name } => {
+                    if let Err(err) = app.emit_all(MACRO_FIRED_EVENT, name) {
+                        error!("error notifying the frontend of a fired macro: {}", err);
+                    }
+                    Ok(None)
+                }
             };
             match result {
                 Ok(Some(data)) => {
                     if let Err(err) = app.emit_all(MACRO_DATA_UPDATED_EVENT, data) {
                         error!("error notifying the frontend of a collection change: {}", err);
                     }
+                    refresh_tray_menu(&app).await;
                 }
                 Ok(None) => {}
                 Err(err) => error!("error executing a backend command: {}", err),
@@ -139,6 +156,7 @@ fn spawn_foreground_watcher(app: tauri::AppHandle) {
                         if let Err(err) = app.emit_all(MACRO_DATA_UPDATED_EVENT, data) {
                             error!("error notifying the frontend of armed collections: {}", err);
                         }
+                        refresh_tray_menu(&app).await;
                     }
                     Ok(None) => {}
                     Err(err) => error!("error arming linked collections: {}", err),
@@ -165,11 +183,110 @@ async fn is_debug() -> Result<bool, String> {
 #[tauri::command]
 /// Allows the frontend to disable the macro execution scanning completely.
 async fn control_grabbing(
+    app: tauri::AppHandle,
     state: tauri::State<'_, MacroBackend>,
     frontend_bool: bool,
 ) -> Result<(), ()> {
     state.set_is_listening(frontend_bool);
+    refresh_tray_menu(&app).await;
     Ok(())
+}
+
+/// Event carrying whether macro output is enabled, after the tray changed it.
+const LISTENING_CHANGED_EVENT: &str = "listening-changed";
+
+/// Tray item ids.
+const TRAY_TOGGLE_OUTPUT: &str = "toggle_output";
+const TRAY_COLLECTION_PREFIX: &str = "collection:";
+
+/// Builds the tray menu: macro output toggle, one entry per collection (checked when active,
+/// disabled when the collection is controlled by linked applications), show/hide and quit.
+fn build_tray_menu(data: &MacroData, listening: bool, window_visible: bool) -> SystemTrayMenu {
+    let mut menu = SystemTrayMenu::new()
+        .add_item(CustomMenuItem::new(
+            TRAY_TOGGLE_OUTPUT,
+            if listening {
+                "Disable macro output"
+            } else {
+                "Enable macro output"
+            },
+        ))
+        .add_native_item(SystemTrayMenuItem::Separator);
+
+    for (index, collection) in data.data.iter().enumerate() {
+        let label = if collection.is_linked() {
+            format!(
+                "{}  ({})",
+                collection.name,
+                if collection.active { "armed" } else { "auto" }
+            )
+        } else {
+            collection.name.clone()
+        };
+        let mut item = CustomMenuItem::new(format!("{}{}", TRAY_COLLECTION_PREFIX, index), label);
+        if collection.active {
+            item = item.selected();
+        }
+        if collection.is_linked() {
+            item = item.disabled();
+        }
+        menu = menu.add_item(item);
+    }
+
+    menu.add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new(
+            "hide_show",
+            if window_visible { "Hide" } else { "Show" },
+        ))
+        .add_item(CustomMenuItem::new("quit", "Quit"))
+}
+
+/// Rebuilds the tray menu from the current backend state.
+async fn refresh_tray_menu(app: &tauri::AppHandle) {
+    let backend = app.state::<MacroBackend>();
+    let data = backend.data.read().await.clone();
+    let listening = backend.is_listening.load(std::sync::atomic::Ordering::Relaxed);
+    let window_visible = app
+        .get_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(true);
+    if let Err(err) = app
+        .tray_handle()
+        .set_menu(build_tray_menu(&data, listening, window_visible))
+    {
+        error!("error updating the tray menu: {}", err);
+    }
+}
+
+/// Handles a click on a collection entry in the tray: toggles it (linked ones are refused by
+/// the backend) and tells the frontend.
+fn toggle_collection_from_tray(app: tauri::AppHandle, index: usize) {
+    tauri::async_runtime::spawn(async move {
+        let backend = app.state::<MacroBackend>();
+        let name = backend
+            .data
+            .read()
+            .await
+            .data
+            .get(index)
+            .map(|collection| collection.name.clone());
+        let Some(name) = name else {
+            return;
+        };
+        match backend
+            .set_collection_active(&name, wooting_macro_backend::plugin::system_event::CollectionMode::Toggle)
+            .await
+        {
+            Ok(Some(data)) => {
+                if let Err(err) = app.emit_all(MACRO_DATA_UPDATED_EVENT, data) {
+                    error!("error notifying the frontend of a collection change: {}", err);
+                }
+            }
+            Ok(None) => {}
+            Err(err) => error!("error toggling a collection from the tray: {}", err),
+        }
+        refresh_tray_menu(&app).await;
+    });
 }
 
 /// Enables or disables the automatic startup of Wootomation at system start.
@@ -250,7 +367,8 @@ async fn main() -> Result<(), Error> {
             control_grabbing,
             is_debug,
             list_processes,
-            list_applications
+            list_applications,
+            get_status
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;
@@ -260,6 +378,9 @@ async fn main() -> Result<(), Error> {
 
             spawn_foreground_watcher(app.handle());
             spawn_command_processor(app.handle());
+
+            let handle = app.handle();
+            tauri::async_runtime::spawn(async move { refresh_tray_menu(&handle).await });
 
             Ok(())
         })
@@ -271,7 +392,26 @@ async fn main() -> Result<(), Error> {
                 // just get a `AppHandle` instance with `app.handle()` on the setup hook
                 // and move it to another function or thread
                 let item_handle = app.tray_handle().get_item(&id);
+                if let Some(index) = id.strip_prefix(TRAY_COLLECTION_PREFIX) {
+                    if let Ok(index) = index.parse::<usize>() {
+                        toggle_collection_from_tray(app.clone(), index);
+                    }
+                    return;
+                }
                 match id.as_str() {
+                    TRAY_TOGGLE_OUTPUT => {
+                        let backend = app.state::<MacroBackend>();
+                        let listening =
+                            !backend.is_listening.load(std::sync::atomic::Ordering::Relaxed);
+                        backend.set_is_listening(listening);
+                        if let Err(err) = app.emit_all(LISTENING_CHANGED_EVENT, listening) {
+                            error!("error notifying the frontend of macro output: {}", err);
+                        }
+                        let handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            refresh_tray_menu(&handle).await
+                        });
+                    }
                     "hide_show" => {
                         let window = app.get_window("main").expect("Couldn't fetch window");
 

@@ -41,6 +41,7 @@ export type MacroState = {
   updateHoldThreshold: (milliseconds: number) => void
   updateTapMode: (mode: TapMode) => void
   updateRepeatCount: (count: number | null) => void
+  updateMacroLinkedProcesses: (linked: string[]) => void
   updateTrigger: (newElement: TriggerEventType) => void
   updateAllowWhileOtherKeys: (value: boolean) => void
   onElementAdd: (newElement: ActionEventType) => void
@@ -126,6 +127,17 @@ export interface Macro {
   tap_mode?: TapMode
   /** Single: plays per trigger (default 1). Toggle: loops before stopping (null = until triggered again). */
   repeat_count?: number | null
+  /** Executable names; when set, the macro fires only while one of them is focused. */
+  linked_processes?: string[]
+}
+
+/** Backend health snapshot, see get_status. */
+export interface BackendStatus {
+  hook_healthy: boolean
+  hook_events: number
+  rehooks: number
+  foreground: string | null
+  listening: boolean
 }
 
 export interface Collection {

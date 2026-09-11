@@ -1,6 +1,12 @@
 import {
+  Button,
   Divider,
   HStack,
+  Tag,
+  TagLabel,
+  useDisclosure,
+  Wrap,
+  WrapItem,
   NumberDecrementStepper,
   NumberIncrementStepper,
   NumberInput,
@@ -18,6 +24,7 @@ import {
   MacroType
 } from '../../constants/enums'
 import { TapMode } from '../../types'
+import ApplicationPickerModal from '../ApplicationPickerModal'
 
 /** Settings that depend on the macro type: repeat count, hold threshold and tap mode. */
 export default function BehaviourMacroSettings() {
@@ -33,8 +40,19 @@ export default function BehaviourMacroSettings() {
 }
 
 function BehaviourMacroSettingsInner() {
-  const { macro, updateHoldThreshold, updateTapMode, updateRepeatCount } =
-    useOptionalMacroContext()!
+  const {
+    macro,
+    updateHoldThreshold,
+    updateTapMode,
+    updateRepeatCount,
+    updateMacroLinkedProcesses
+  } = useOptionalMacroContext()!
+  const {
+    isOpen: isPickerOpen,
+    onOpen: onPickerOpen,
+    onClose: onPickerClose
+  } = useDisclosure()
+  const linked = macro.linked_processes ?? []
   const isSingle = macro.macro_type === 'Single'
   const isToggle = macro.macro_type === 'Toggle'
   const isOnHold = macro.macro_type === 'OnHold'
@@ -53,6 +71,41 @@ function BehaviourMacroSettingsInner() {
           {MacroTypeDefinitions[typeIndex]} Change the type with the buttons
           in the macro header.
         </Text>
+      </VStack>
+      <Divider />
+
+      <VStack align="stretch" spacing={1}>
+        <Text fontWeight="semibold">Only in these applications</Text>
+        <Text fontSize="sm" opacity={0.8}>
+          Optional. The macro fires only while one of these applications is
+          the focused window, on top of its collection being on. Leave empty
+          to follow the collection.
+        </Text>
+        <Wrap>
+          {linked.length === 0 && (
+            <Text fontSize="sm" opacity={0.6}>
+              Follows the collection.
+            </Text>
+          )}
+          {linked.map((name) => (
+            <WrapItem key={name}>
+              <Tag size="sm" variant="subtle" colorScheme="primary-accent">
+                <TagLabel>{name}</TagLabel>
+              </Tag>
+            </WrapItem>
+          ))}
+        </Wrap>
+        <Button size="sm" alignSelf="flex-start" onClick={onPickerOpen}>
+          Choose applications…
+        </Button>
+        <ApplicationPickerModal
+          isOpen={isPickerOpen}
+          onClose={onPickerClose}
+          title="Applications for this macro"
+          description="The macro fires only while one of these applications is the focused window. Leave the list empty to follow the collection."
+          linked={linked}
+          onChange={updateMacroLinkedProcesses}
+        />
       </VStack>
       <Divider />
 

@@ -1,5 +1,16 @@
 import { DeleteIcon, LinkIcon } from '@chakra-ui/icons'
 import {
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  IconButton,
+  useToast
+} from '@chakra-ui/react'
+import { KebabVertical } from '../icons'
+import { exportCollection, importFile } from '../../constants/transfer'
+import { error } from 'tauri-plugin-log'
+import {
   Box,
   Button,
   Flex,
@@ -29,8 +40,10 @@ export default function CollectionPanel({ searchValue }: Props) {
     collections,
     selection,
     onCollectionUpdate,
+    onCollectionAdd,
     onSelectedCollectionDelete
   } = useApplicationContext()
+  const toast = useToast()
   const currentCollection = useSelectedCollection()
   const {
     isOpen: isDeleteModalOpen,
@@ -48,6 +61,72 @@ export default function CollectionPanel({ searchValue }: Props) {
     onClose: onLinkedAppsModalClose
   } = useDisclosure()
   const linkedCount = (currentCollection.linked_processes ?? []).length
+
+  const onExportCollection = useCallback(() => {
+    exportCollection(currentCollection)
+      .then((saved) => {
+        if (saved)
+          toast({ title: 'Collection exported', status: 'success', duration: 2500 })
+      })
+      .catch((e) => {
+        error(String(e))
+        toast({ title: 'Export failed', description: String(e), status: 'error' })
+      })
+  }, [currentCollection, toast])
+
+  const onImport = useCallback(
+    (intoThisCollection: boolean) => {
+      importFile()
+        .then((content) => {
+          if (!content) return
+          let macros = [...content.macros]
+          if (intoThisCollection) {
+            for (const collection of content.collections) {
+              macros = macros.concat(collection.macros)
+            }
+            if (macros.length === 0) {
+              toast({ title: 'Nothing to import', status: 'warning', duration: 2500 })
+              return
+            }
+            onCollectionUpdate(
+              { ...currentCollection, macros: [...currentCollection.macros, ...macros] },
+              selection.collectionIndex
+            )
+            toast({
+              title: `Imported ${macros.length} macro${macros.length === 1 ? '' : 's'} into ${currentCollection.name}`,
+              status: 'success',
+              duration: 2500
+            })
+          } else {
+            const newCollections = [...content.collections]
+            if (macros.length > 0) {
+              newCollections.push({
+                name: 'Imported macros',
+                icon: ':package:',
+                active: true,
+                macros,
+                linked_processes: []
+              })
+            }
+            if (newCollections.length === 0) {
+              toast({ title: 'Nothing to import', status: 'warning', duration: 2500 })
+              return
+            }
+            newCollections.forEach((collection) => onCollectionAdd(collection))
+            toast({
+              title: `Imported ${newCollections.length} collection${newCollections.length === 1 ? '' : 's'}`,
+              status: 'success',
+              duration: 2500
+            })
+          }
+        })
+        .catch((e) => {
+          error(String(e))
+          toast({ title: 'Import failed', description: String(e), status: 'error' })
+        })
+    },
+    [currentCollection, onCollectionAdd, onCollectionUpdate, selection.collectionIndex, toast]
+  )
   const [collectionName, setCollectionName] = useState('')
   const borderColour = useBorderColour()
   const isCollectionUndeletable = collections.length <= 1
@@ -145,6 +224,24 @@ export default function CollectionPanel({ searchValue }: Props) {
             <Button leftIcon={<AddIcon />} size={['xs', 'sm', 'md']} isDisabled>
               Import Macros
             </Button> */}
+              <Menu variant="brand">
+                <MenuButton
+                  as={IconButton}
+                  aria-label="Collection options"
+                  icon={<KebabVertical />}
+                  size="md"
+                  variant="brand"
+                />
+                <MenuList p="2">
+                  <MenuItem onClick={onExportCollection}>Export collection…</MenuItem>
+                  <MenuItem onClick={() => onImport(true)}>
+                    Import macros into this collection…
+                  </MenuItem>
+                  <MenuItem onClick={() => onImport(false)}>
+                    Import as new collection…
+                  </MenuItem>
+                </MenuList>
+              </Menu>
               <Tooltip
                 variant="brand"
                 label="Arm this collection only while linked applications are focused"

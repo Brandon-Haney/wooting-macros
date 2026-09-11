@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "Wootomation",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "tauri": {
     "allowlist": {
@@ -20,7 +20,13 @@
         "writeText": true
       },
       "dialog": {
-        "open": true
+        "open": true,
+        "save": true
+      },
+      "fs": {
+        "readFile": true,
+        "writeFile": true,
+        "scope": ["$HOME/**", "$DOCUMENT/**", "$DOWNLOAD/**", "$DESKTOP/**"]
       },
       "os": {
         "all": true
@@ -73,12 +79,12 @@
       "iconAsTemplate": true
     },
     "updater": {
-      "active": false,
+      "active": true,
       "endpoints": [
-        "https://github.com/WootingKb/wooting-macros/releases/latest/download/latest.json"
+        "https://github.com/Brandon-Haney/wooting-macros/releases/latest/download/latest.json"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREQUQ1NEIxNDQzMzRDRApSV1ROTkVNVVM5WGFCRnJ1bmtMZmtOa0ZwT1dQSWhyZmk4WWJhSmU1YXpaSTBicHVabE02RnVLMAo="
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4RTIzMDNCM0Q1QkJENTAKUldSUXZWczlPekRpK0hxdmljb0xFaHRkclp5UVAwamg0cGk0TENNQ21NQXRieG1jQzAwSHNHOWYK"
     },
     "windows": [
       {

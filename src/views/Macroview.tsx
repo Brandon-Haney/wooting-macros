@@ -5,6 +5,7 @@ import SequencingArea from '../components/macroview/centerPanel/SequencingArea'
 import Header from '../components/macroview/topArea/Header'
 import { useMacroContext } from '../contexts/macroContext'
 import { useEffect, useState } from 'react'
+import useEditorShortcuts from '../hooks/useEditorShortcuts'
 
 type Props = {
   isEditing: boolean
@@ -17,6 +18,7 @@ export default function Macroview({
 }: Props) {
   const { changeIsUpdatingMacro } = useMacroContext()
   const [searchValue, changeSearchValue] = useState('')
+  useEditorShortcuts()
 
   useEffect(() => {
     changeIsUpdatingMacro(isEditing)

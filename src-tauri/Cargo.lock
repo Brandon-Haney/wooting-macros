@@ -2840,6 +2840,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
+name = "minisign-verify"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22f9645cb765ea72b8111f36c522475d2daa0d22c957a9826437e97534bc4e9e"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4813,6 +4819,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd27c04b9543776a972c86ccf70660b517ecabbeced9fb58d8b961a13ad129af"
 dependencies = [
  "anyhow",
+ "base64 0.21.7",
  "bytes",
  "cocoa 0.24.1",
  "dirs-next",
@@ -4827,6 +4834,7 @@ dependencies = [
  "http",
  "ignore",
  "infer 0.9.0",
+ "minisign-verify",
  "notify-rust",
  "objc",
  "once_cell",
@@ -4855,12 +4863,14 @@ dependencies = [
  "tauri-utils",
  "tempfile",
  "thiserror",
+ "time",
  "tokio",
  "url",
  "uuid",
  "webkit2gtk",
  "webview2-com",
  "windows 0.39.0",
+ "zip",
 ]
 
 [[package]]
@@ -6347,7 +6357,7 @@ dependencies = [
 
 [[package]]
 name = "wooting-macro-backend"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "copypasta",
@@ -6376,7 +6386,7 @@ dependencies = [
 
 [[package]]
 name = "wooting-macros"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "auto-launch",
@@ -6627,6 +6637,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "zip"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
+dependencies = [
+ "byteorder",
+ "crc32fast",
+ "crossbeam-utils",
 ]
 
 [[package]]

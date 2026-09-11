@@ -49,7 +49,8 @@ const macroDefault: Macro = {
   sequence: [],
   hold_threshold_ms: DEFAULT_HOLD_THRESHOLD_MS,
   tap_mode: 'DeferredTap',
-  repeat_count: null
+  repeat_count: null,
+  linked_processes: []
 }
 
 /** Like useMacroContext, but returns undefined outside the macro editor instead of throwing. */
@@ -204,6 +205,13 @@ function MacroProvider({ children }: MacroProviderProps) {
   const updateTapMode = useCallback(
     (mode: TapMode) => {
       setMacro({ ...macro, tap_mode: mode })
+    },
+    [macro, setMacro]
+  )
+
+  const updateMacroLinkedProcesses = useCallback(
+    (linked: string[]) => {
+      setMacro({ ...macro, linked_processes: linked })
     },
     [macro, setMacro]
   )
@@ -395,6 +403,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateHoldThreshold,
       updateTapMode,
       updateRepeatCount,
+      updateMacroLinkedProcesses,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,
@@ -424,6 +433,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateHoldThreshold,
       updateTapMode,
       updateRepeatCount,
+      updateMacroLinkedProcesses,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,

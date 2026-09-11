@@ -7,7 +7,8 @@ import {
   Keypress,
   MacroData,
   MousePressAction,
-  ApplicationEntry
+  ApplicationEntry,
+  BackendStatus
 } from '../types'
 import { HIDLookup } from './HIDmap'
 import { mouseEnumLookup } from './MouseMap'
@@ -35,6 +36,10 @@ export const listProcesses = (): Promise<string[]> => {
 
 export const listApplications = (): Promise<ApplicationEntry[]> => {
   return invoke<ApplicationEntry[]>('list_applications', {})
+}
+
+export const getStatus = (): Promise<BackendStatus> => {
+  return invoke<BackendStatus>('get_status', {})
 }
 
 export const isDebug = (): Promise<boolean> => {

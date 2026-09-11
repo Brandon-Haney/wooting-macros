@@ -84,6 +84,16 @@ function ApplicationProvider({ children }: ApplicationProviderProps) {
       })
   }, [toast])
 
+  // Macro output can be toggled from the tray.
+  useEffect(() => {
+    const unlisten = listen<boolean>('listening-changed', (event) => {
+      setIsMacroOutputEnabled(event.payload)
+    })
+    return () => {
+      unlisten.then((stop) => stop()).catch((e) => error(e))
+    }
+  }, [])
+
   // The backend arms and disarms collections linked to applications on its own.
   useEffect(() => {
     const unlisten = listen<MacroData>('macro-data-updated', (event) => {

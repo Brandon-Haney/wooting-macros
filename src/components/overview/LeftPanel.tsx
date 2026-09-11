@@ -10,6 +10,7 @@ import useScrollbarStyles from '../../hooks/useScrollbarStyles'
 import useMainBgColour from '../../hooks/useMainBgColour'
 import useBorderColour from '../../hooks/useBorderColour'
 import { error } from 'tauri-plugin-log'
+import StatusBar from '../StatusBar'
 
 import { SearchBar } from "../leftPanel/SearchBar";
 
@@ -117,6 +118,7 @@ export default function LeftPanel({
         </VStack>
       </VStack>
       <VStack w="full" px={4} pb={4}>
+        <StatusBar />
         <Button
           w="full"
           colorScheme={isMacroOutputEnabled ? 'green' : 'orange'}

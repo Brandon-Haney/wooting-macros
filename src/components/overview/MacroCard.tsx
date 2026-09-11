@@ -7,8 +7,10 @@ import {
   Kbd,
   Menu,
   MenuButton,
+  MenuGroup,
   MenuItem,
   MenuList,
+  useToast,
   Switch,
   Text,
   Tooltip,
@@ -24,6 +26,8 @@ import { mouseEnumLookup } from '../../constants/MouseMap'
 import { useCallback, useMemo } from 'react'
 import { KebabVertical } from '../icons'
 import useMainBgColour from '../../hooks/useMainBgColour'
+import { exportMacro } from '../../constants/transfer'
+import { error } from 'tauri-plugin-log'
 
 interface Props {
   macro: Macro
@@ -40,8 +44,9 @@ export default function MacroCard({
   collectionName,
   searchValue
 }: Props) {
-  const { selection, onCollectionUpdate, changeSelectedMacroIndex } =
+  const { selection, onCollectionUpdate, changeSelectedMacroIndex, collections } =
     useApplicationContext()
+  const toast = useToast()
   const currentCollection = useSelectedCollection()
   const secondBg = useColorModeValue('blue.50', 'gray.800')
   const shadowColour = useColorModeValue('md', 'white-md')
@@ -70,6 +75,36 @@ export default function MacroCard({
     newCollection.macros.push(macro)
     onCollectionUpdate(newCollection, selection.collectionIndex)
   }, [currentCollection, macro, onCollectionUpdate, selection.collectionIndex])
+
+  const onCopyTo = useCallback(
+    (targetIndex: number) => {
+      const target = collections[targetIndex]
+      if (!target) return
+      onCollectionUpdate(
+        { ...target, macros: [...target.macros, structuredClone(macro)] },
+        targetIndex
+      )
+      toast({
+        title: `Copied "${macro.name}" to ${target.name}`,
+        status: 'success',
+        duration: 2500,
+        isClosable: true
+      })
+    },
+    [collections, macro, onCollectionUpdate, toast]
+  )
+
+  const onExport = useCallback(() => {
+    exportMacro(macro)
+      .then((saved) => {
+        if (saved)
+          toast({ title: 'Macro exported', status: 'success', duration: 2500 })
+      })
+      .catch((e) => {
+        error(String(e))
+        toast({ title: 'Export failed', description: String(e), status: 'error' })
+      })
+  }, [macro, toast])
 
   const isSearching: boolean = useMemo((): boolean => {
     return searchValue.length !== 0
@@ -122,8 +157,22 @@ export default function MacroCard({
           </MenuButton>
           <MenuList p="2" right={0}>
             <MenuItem onClick={onDuplicate}>Duplicate</MenuItem>
-            {/* <MenuItem isDisabled>Move to Collection</MenuItem> */}
-            {/* <MenuItem isDisabled>Export</MenuItem> */}
+            <MenuItem onClick={onExport}>Export…</MenuItem>
+            {collections.length > 1 && (
+              <MenuGroup title="Copy to collection">
+                {collections.map((collection, targetIndex) =>
+                  targetIndex === selection.collectionIndex ? null : (
+                    <MenuItem
+                      key={`${collection.name}-${targetIndex}`}
+                      pl={6}
+                      onClick={() => onCopyTo(targetIndex)}
+                    >
+                      {collection.name}
+                    </MenuItem>
+                  )
+                )}
+              </MenuGroup>
+            )}
             <Divider />
             <MenuItem
               onClick={() => onDelete(index)}
