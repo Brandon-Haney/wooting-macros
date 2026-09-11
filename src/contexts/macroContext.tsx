@@ -65,6 +65,7 @@ function MacroProvider({ children }: MacroProviderProps) {
   const [selectedElementId, setSelectedElementId] = useState<
     number | undefined
   >(undefined)
+  const [selectedElementIds, setSelectedElementIds] = useState<number[]>([])
   const [isUpdatingMacro, setIsUpdatingMacro] = useState(false)
   const currentMacro = useSelectedMacro()
   const currentCollection = useSelectedCollection()
@@ -284,9 +285,17 @@ function MacroProvider({ children }: MacroProviderProps) {
   const updateSelectedElementId = useCallback(
     (newIndex: number | undefined) => {
       setSelectedElementId(newIndex)
+      if (newIndex === undefined) setSelectedElementIds([])
     },
     [setSelectedElementId]
   )
+  const updateSelectedElementIds = useCallback((indexes: number[]) => {
+    setSelectedElementIds((current) =>
+      current.length === indexes.length && current.every((v, i) => v === indexes[i])
+        ? current
+        : indexes
+    )
+  }, [])
 
   const onElementAdd = useCallback(
     (newElement: ActionEventType) => {
@@ -334,6 +343,18 @@ function MacroProvider({ children }: MacroProviderProps) {
       onIdDelete(index)
     },
     [onIdDelete, sequence]
+  )
+  /** Removes several elements at once (storage indexes), keeping the display order. */
+  const onElementsDelete = useCallback(
+    (indexes: number[]) => {
+      const drop = new Set(indexes)
+      const kept = ids.map((id) => sequence[id - 1]).filter((_, i) => !drop.has(ids[i] - 1))
+      setSequence(kept)
+      setIds(kept.map((_, i) => i + 1))
+      setSelectedElementId(undefined)
+      setSelectedElementIds([])
+    },
+    [ids, sequence]
   )
 
   const overwriteSequence = useCallback(
@@ -394,6 +415,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       sequence,
       ids,
       selectedElementId,
+      selectedElementIds,
       isUpdatingMacro,
       canSaveMacro,
       willCauseTriggerLooping,
@@ -410,12 +432,14 @@ function MacroProvider({ children }: MacroProviderProps) {
       onElementsAdd,
       updateElement,
       onElementDelete,
+      onElementsDelete,
       overwriteSequence,
       onIdAdd,
       onIdsAdd,
       onIdDelete,
       overwriteIds,
       updateSelectedElementId,
+      updateSelectedElementIds,
       updateMacro,
       changeIsUpdatingMacro
     }),
@@ -424,6 +448,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       sequence,
       ids,
       selectedElementId,
+      selectedElementIds,
       isUpdatingMacro,
       canSaveMacro,
       willCauseTriggerLooping,
@@ -440,12 +465,14 @@ function MacroProvider({ children }: MacroProviderProps) {
       onElementsAdd,
       updateElement,
       onElementDelete,
+      onElementsDelete,
       overwriteSequence,
       onIdAdd,
       onIdsAdd,
       onIdDelete,
       overwriteIds,
       updateSelectedElementId,
+      updateSelectedElementIds,
       updateMacro,
       changeIsUpdatingMacro
     ]

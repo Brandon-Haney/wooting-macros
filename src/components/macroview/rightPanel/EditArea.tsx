@@ -1,4 +1,5 @@
-import { Box, HStack, Text, useColorModeValue, VStack } from '@chakra-ui/react'
+import { Box, Button, HStack, Kbd, Text, useColorModeValue, VStack } from '@chakra-ui/react'
+import { DeleteIcon } from '@chakra-ui/icons'
 import React, { useMemo } from 'react'
 import { useMacroContext } from '../../../contexts/macroContext'
 import { useSelectedElement } from '../../../contexts/selectors'
@@ -41,7 +42,14 @@ export function BoxText({ children }: { children: string }) {
 
 export default function EditArea() {
   const selectedElement = useSelectedElement()
-  const { selectedElementId } = useMacroContext()
+  const {
+    selectedElementId,
+    selectedElementIds,
+    onElementDelete,
+    onElementsDelete,
+    updateSelectedElementId
+  } = useMacroContext()
+  const multi = selectedElementIds.length > 1
 
   const SelectedElementFormComponent = useMemo(() => {
     if (!selectedElement || selectedElementId === undefined) {
@@ -94,7 +102,49 @@ export default function EditArea() {
       px={[2, 4, 6]}
       pt={[2, 4]}
     >
-      {SelectedElementFormComponent}
+      {multi ? (
+        <VStack w="full" spacing={3} pt={2}>
+          <Text fontWeight="semibold">{selectedElementIds.length} elements selected</Text>
+          <Text fontSize="sm" textAlign="center" opacity={0.8}>
+            Drag them together on the timeline, nudge with the arrow keys, or delete them all.
+          </Text>
+          <HStack>
+            <Button
+              size="sm"
+              variant="brandWarning"
+              leftIcon={<DeleteIcon />}
+              onClick={() => onElementsDelete(selectedElementIds)}
+            >
+              Delete all
+            </Button>
+            <Button size="sm" variant="brand" onClick={() => updateSelectedElementId(undefined)}>
+              Clear selection
+            </Button>
+          </HStack>
+        </VStack>
+      ) : (
+        <>
+          {SelectedElementFormComponent}
+          {selectedElement && selectedElementId !== undefined && (
+            <HStack w="full" pt={4} justify="space-between" flexWrap="wrap" rowGap={2}>
+              <Text fontSize="xs" opacity={0.7}>
+                <Kbd fontSize="xs">Del</Kbd> also removes it
+              </Text>
+              <Button
+                size="sm"
+                variant="brandWarning"
+                leftIcon={<DeleteIcon />}
+                onClick={() => {
+                  onElementDelete(selectedElementId)
+                  updateSelectedElementId(undefined)
+                }}
+              >
+                Delete element
+              </Button>
+            </HStack>
+          )}
+        </>
+      )}
     </VStack>
   )
 }

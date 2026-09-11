@@ -198,3 +198,50 @@ export function itemsInRect(
   }
   return ids
 }
+
+/** Copies the given bars right after themselves (and instants 1 ms later); returns the new ids too. */
+export function duplicateItems(
+  schedule: Schedule,
+  ids: Set<string>
+): { schedule: Schedule; added: Set<string> } {
+  const added = new Set<string>()
+  const bars = [...schedule.bars]
+  const instants = [...schedule.instants]
+  let n = 0
+  for (const bar of schedule.bars) {
+    if (!ids.has(bar.id)) continue
+    const length = bar.end - bar.start
+    const copy: Bar = {
+      ...bar,
+      id: `d${Date.now()}${n++}`,
+      start: bar.end,
+      end: bar.end + length,
+      openEnd: false,
+      openStart: false,
+      source: []
+    }
+    bars.push(copy)
+    added.add(copy.id)
+  }
+  for (const instant of schedule.instants) {
+    if (!ids.has(instant.id)) continue
+    const copy: Instant = { ...instant, id: `d${Date.now()}${n++}`, at: instant.at + 1, source: -1 }
+    instants.push(copy)
+    added.add(copy.id)
+  }
+  return { schedule: withTotal({ ...schedule, bars, instants }), added }
+}
+
+/** Puts the given bars on another key or mouse track. */
+export function retrackBars(schedule: Schedule, ids: Set<string>, track: string): Schedule {
+  if (track === EVENTS_TRACK) return schedule
+  return withTracks({
+    ...schedule,
+    bars: schedule.bars.map((bar) => (ids.has(bar.id) ? { ...bar, track } : bar))
+  })
+}
+
+/** Ids of every bar on a track. */
+export function barsOnTrack(schedule: Schedule, track: string): Set<string> {
+  return new Set(schedule.bars.filter((bar) => bar.track === track).map((bar) => bar.id))
+}

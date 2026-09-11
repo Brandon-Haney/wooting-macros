@@ -9,7 +9,7 @@ import {
   useColorModeValue
 } from '@chakra-ui/react'
 import { AddIcon, MinusIcon } from '@chakra-ui/icons'
-import {
+import React, {
   DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -37,9 +37,13 @@ import {
   Schedule,
   Track
 } from '../../../../utils/schedule'
+import TimelineMenu, { MenuItem } from './TimelineMenu'
+import KeyPickerModal from './KeyPickerModal'
 import {
   addBar,
   addInstant,
+  barsOnTrack,
+  duplicateItems,
   findItem,
   itemsForElements,
   itemsInRect,
@@ -47,6 +51,7 @@ import {
   moveItems,
   removeItems,
   resizeBar,
+  retrackBars,
   setTotal,
   snap
 } from '../../../../utils/scheduleEdit'
@@ -128,7 +133,9 @@ export default function Timeline({
     sequence,
     ids,
     selectedElementId,
+    selectedElementIds,
     updateSelectedElementId,
+    updateSelectedElementIds,
     overwriteSequence
   } = useMacroContext()
 
@@ -149,6 +156,8 @@ export default function Timeline({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [band, setBand] = useState<BandRect | null>(null)
   const [dropHint, setDropHint] = useState<number | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; kind: 'bar' | 'row'; id: string } | null>(null)
+  const [picker, setPicker] = useState<{ ids: Set<string>; title: string } | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState(0)
@@ -460,6 +469,122 @@ export default function Timeline({
     [selectedElementId, selectedIds, storageIndex]
   )
 
+  /** A row counts as selected when every press on it is. */
+  const rowSelected = useCallback(
+    (track: string) => {
+      const bars = barsOnTrack(view, track)
+      return bars.size > 0 && [...bars].every((id) => selectedIds.has(id))
+    },
+    [selectedIds, view]
+  )
+
+  /** Selects every press on a row; `additive` keeps the current selection. */
+  const selectRow = useCallback(
+    (track: string, additive: boolean) => {
+      const bars = barsOnTrack(schedule, track)
+      if (bars.size === 0) return
+      setSelectedIds((current) => {
+        const next = additive ? new Set(current) : new Set<string>()
+        const allIn = [...bars].every((id) => current.has(id))
+        for (const id of bars) {
+          if (additive && allIn) next.delete(id)
+          else next.add(id)
+        }
+        return next
+      })
+      const first = schedule.bars.find((b) => b.track === track)
+      if (first && first.source[0] !== undefined) updateSelectedElementId(storageIndex(first.source[0]))
+    },
+    [schedule, storageIndex, updateSelectedElementId]
+  )
+
+  // Publish the multi-selection (storage indexes) so the right panel can act on it.
+  useEffect(() => {
+    const indexes = new Set<number>()
+    for (const bar of schedule.bars) {
+      if (selectedIds.has(bar.id)) for (const src of bar.source) indexes.add(storageIndex(src))
+    }
+    for (const i of schedule.instants) {
+      if (selectedIds.has(i.id) && i.source >= 0) indexes.add(storageIndex(i.source))
+    }
+    updateSelectedElementIds([...indexes].sort((a, b) => a - b))
+  }, [schedule, selectedIds, storageIndex, updateSelectedElementIds])
+
+  // The right panel cleared the selection.
+  useEffect(() => {
+    if (selectedElementIds.length === 0 && selectedElementId === undefined) {
+      setSelectedIds((current) => (current.size === 0 ? current : new Set()))
+    }
+  }, [selectedElementId, selectedElementIds])
+
+  const deleteIds = useCallback(
+    (target: Set<string>) => {
+      if (target.size > 0) commit(removeItems(schedule, target))
+    },
+    [commit, schedule]
+  )
+  const duplicateIds = useCallback(
+    (target: Set<string>) => {
+      const { schedule: next, added } = duplicateItems(schedule, target)
+      const first = next.bars.find((b) => added.has(b.id))
+      commit(next, first ? { track: first.track, at: first.start } : undefined)
+    },
+    [commit, schedule]
+  )
+  const rekey = useCallback(
+    (target: Set<string>, track: string) => {
+      const next = retrackBars(schedule, target, track)
+      const first = next.bars.find((b) => target.has(b.id))
+      commit(next, first ? { track, at: first.start } : undefined)
+    },
+    [commit, schedule]
+  )
+
+  const menuItems = useMemo((): (MenuItem | 'divider')[] => {
+    if (!menu) return []
+    if (menu.kind === 'row') {
+      const rowIds = barsOnTrack(schedule, menu.id)
+      return [
+        { label: 'Select row', onClick: () => selectRow(menu.id, false) },
+        {
+          label: 'Change key…',
+          onClick: () => setPicker({ ids: rowIds, title: 'Move every press on this row to' })
+        },
+        'divider',
+        { label: `Delete row (${rowIds.size})`, onClick: () => deleteIds(rowIds), danger: true }
+      ]
+    }
+    const target = selectedIds.has(menu.id) ? selectedIds : new Set([menu.id])
+    const bar = schedule.bars.find((b) => b.id === menu.id)
+    const count = target.size
+    const plural = count > 1 ? ` (${count})` : ''
+    return [
+      { label: `Duplicate${plural}`, onClick: () => duplicateIds(target) },
+      ...(bar
+        ? [
+            { label: 'Select all on this row', onClick: () => selectRow(bar.track, false) },
+            {
+              label: `Move to another key…${plural}`,
+              onClick: () => setPicker({ ids: target, title: 'Move the press to' })
+            }
+          ]
+        : []),
+      'divider',
+      { label: `Delete${plural}`, onClick: () => deleteIds(target), danger: true }
+    ]
+  }, [deleteIds, duplicateIds, menu, schedule, selectRow, selectedIds])
+
+  const openItemMenu = useCallback(
+    (item: Bar | Instant, event: React.MouseEvent) => {
+      if (recording) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (!selectedIds.has(item.id)) selectItem(item, false)
+      setMenu({ x: event.clientX, y: event.clientY, kind: 'bar', id: item.id })
+    },
+    [recording, selectItem, selectedIds]
+  )
+
   /** Ids to act on for keyboard edits. */
   const activeIds = useCallback((): Set<string> => {
     if (selectedIds.size > 0) return selectedIds
@@ -577,6 +702,7 @@ export default function Timeline({
   const recordColour = useColorModeValue('red.500', 'red.300')
   const bandColour = useColorModeValue('rgba(66, 153, 225, 0.2)', 'rgba(144, 205, 244, 0.2)')
   const bandBorder = useColorModeValue('blue.400', 'blue.200')
+  const rowSelectedBg = useColorModeValue('primary-accent.100', 'primary-accent.800')
 
   const bracketLabel = useMemo(() => {
     const count = macro.repeat_count ?? null
@@ -630,7 +756,7 @@ export default function Timeline({
     <Flex direction="column" w="full" h="full" minH={0}>
       <HStack w="full" px={[2, 4, 6]} py={1} justify="space-between" spacing={2}>
         <Tooltip
-          label="Drag a bar to move it (Shift snaps to 10 ms), its edges to resize. Drag on empty space to add a press, click to place the record cursor, Ctrl+drag to select several. Drag the end marker to set the gap before the next loop. Delete removes, arrows nudge."
+          label="Drag a bar to move it (Shift snaps to 10 ms), its edges to resize; right-click a bar for duplicate, delete and move-to-key. Click a row label to select the whole row, right-click it to change its key or delete it. Drag on empty space to add a press, click to place the record cursor, Ctrl+drag to select several. Drag the end marker to set the gap before the next loop. Delete removes, arrows nudge."
           hasArrow
           variant="brand"
           openDelay={300}
@@ -737,7 +863,19 @@ export default function Timeline({
                 top={row * ROW_HEIGHT}
                 bg={row % 2 === 0 ? rowBg : rowAltBg}
                 labelBg={rowBg}
+                selected={track.kind !== 'events' && rowSelected(track.id)}
+                selectedBg={rowSelectedBg}
                 width={width}
+                onLabelClick={(event) => {
+                  if (recording || track.kind === 'events') return
+                  selectRow(track.id, event.ctrlKey || event.metaKey || event.shiftKey)
+                  scrollRef.current?.focus()
+                }}
+                onLabelContextMenu={(event) => {
+                  if (recording || track.kind === 'events') return
+                  event.preventDefault()
+                  setMenu({ x: event.clientX, y: event.clientY, kind: 'row', id: track.id })
+                }}
                 onPointerDown={(event) => {
                   if (event.target !== event.currentTarget) return
                   if (event.ctrlKey || event.metaKey) {
@@ -809,6 +947,7 @@ export default function Timeline({
                 pxPerMs={pxPerMs}
                 colour={isSelected(bar) ? barSelected : barColour}
                 selected={isSelected(bar)}
+                onContextMenu={(event) => openItemMenu(bar, event)}
                 onPointerDown={(event, edge) => {
                   if (edge) {
                     beginDrag({ kind: 'resize', id: bar.id, edge, track: bar.track }, event)
@@ -839,6 +978,7 @@ export default function Timeline({
                 pxPerMs={pxPerMs}
                 colour={isSelected(instant) ? barSelected : barColour}
                 selected={isSelected(instant)}
+                onContextMenu={(event) => openItemMenu(instant, event)}
                 onPointerDown={(event) => {
                   const group = selectedIds.has(instant.id) ? selectedIds : new Set([instant.id])
                   beginDrag(
@@ -959,6 +1099,27 @@ export default function Timeline({
           </Box>
         </Box>
       </Box>
+      {menu && (
+        <TimelineMenu
+          x={menu.x}
+          y={menu.y}
+          title={
+            menu.kind === 'row'
+              ? `Row ${trackLabel(view.tracks.find((t) => t.id === menu.id) ?? { id: menu.id, kind: 'key', code: 0 })}`
+              : undefined
+          }
+          items={menuItems}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      <KeyPickerModal
+        isOpen={picker !== null}
+        title={picker?.title ?? ''}
+        onClose={() => setPicker(null)}
+        onPick={(track) => {
+          if (picker) rekey(picker.ids, track)
+        }}
+      />
     </Flex>
   )
 }
@@ -974,15 +1135,23 @@ function TrackRow({
   top,
   bg,
   labelBg,
+  selected,
+  selectedBg,
   width,
-  onPointerDown
+  onPointerDown,
+  onLabelClick,
+  onLabelContextMenu
 }: {
   track: Track
   top: number
   bg: string
   labelBg: string
+  selected: boolean
+  selectedBg: string
   width: number
   onPointerDown: (event: ReactPointerEvent) => void
+  onLabelClick: (event: React.MouseEvent) => void
+  onLabelContextMenu: (event: React.MouseEvent) => void
 }) {
   const label = trackLabel(track)
   return (
@@ -1005,11 +1174,14 @@ function TrackRow({
         h="full"
         align="center"
         px={2}
-        bg={labelBg}
+        bg={selected ? selectedBg : labelBg}
         borderRight="1px solid"
         borderColor="blackAlpha.200"
-        cursor="default"
+        cursor={track.kind === 'events' ? 'default' : 'pointer'}
+        title={track.kind === 'events' ? undefined : 'Click to select the whole row, right-click for more'}
         onPointerDown={(event) => event.stopPropagation()}
+        onClick={onLabelClick}
+        onContextMenu={onLabelContextMenu}
       >
         {track.kind === 'events' ? (
           <Text fontSize="xs" fontWeight="semibold" noOfLines={1}>
@@ -1031,7 +1203,8 @@ function BarView({
   pxPerMs,
   colour,
   selected,
-  onPointerDown
+  onPointerDown,
+  onContextMenu
 }: {
   bar: Bar
   row: number
@@ -1039,6 +1212,7 @@ function BarView({
   colour: string
   selected: boolean
   onPointerDown: (event: ReactPointerEvent, edge?: 'start' | 'end') => void
+  onContextMenu: (event: React.MouseEvent) => void
 }) {
   const length = bar.end - bar.start
   const widthPx = Math.max(length * pxPerMs, 3)
@@ -1069,6 +1243,7 @@ function BarView({
               : undefined
         }
         onPointerDown={(event) => onPointerDown(event)}
+        onContextMenu={onContextMenu}
       >
         {edges && !bar.openStart && (
           <Box
@@ -1103,7 +1278,8 @@ function InstantView({
   pxPerMs,
   colour,
   selected,
-  onPointerDown
+  onPointerDown,
+  onContextMenu
 }: {
   instant: Instant
   row: number
@@ -1111,6 +1287,7 @@ function InstantView({
   colour: string
   selected: boolean
   onPointerDown: (event: ReactPointerEvent) => void
+  onContextMenu: (event: React.MouseEvent) => void
 }) {
   const label = getElementDisplayString(instant.element)
   const widthPx = Math.max(instant.width * pxPerMs, 0)
@@ -1125,6 +1302,7 @@ function InstantView({
         cursor="grab"
         zIndex={1}
         onPointerDown={onPointerDown}
+        onContextMenu={onContextMenu}
       >
         <Box
           w="12px"

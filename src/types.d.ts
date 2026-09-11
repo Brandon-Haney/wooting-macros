@@ -32,6 +32,8 @@ export type MacroState = {
   sequence: ActionEventType[]
   ids: number[]
   selectedElementId: number | undefined
+  /** Every selected element (storage indexes) when the timeline has a multi-selection; empty otherwise. */
+  selectedElementIds: number[]
   isUpdatingMacro: boolean
   canSaveMacro: boolean
   willCauseTriggerLooping: boolean
@@ -48,12 +50,14 @@ export type MacroState = {
   onElementsAdd: (elements: ActionEventType[]) => void
   updateElement: (newElement: ActionEventType, index: number) => void
   onElementDelete: (index: number) => void
+  onElementsDelete: (indexes: number[]) => void
   overwriteSequence: (newSequence: ActionEventType[]) => void
   onIdAdd: (newId: number) => void
   onIdsAdd: (newIds: number[]) => void
   onIdDelete: (IdToRemove: number) => void
   overwriteIds: (newArray: number[]) => void
   updateSelectedElementId: (newIndex: number | undefined) => void
+  updateSelectedElementIds: (indexes: number[]) => void
   updateMacro: () => void
   changeIsUpdatingMacro: (newVal: boolean) => void
 }
