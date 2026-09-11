@@ -63,6 +63,7 @@ export type SettingsState = {
   updateLaunchOnStartup: (value: boolean) => void
   updateMinimizeOnStartup: (value: boolean) => void
   updateMinimizeOnClose: (value: boolean) => void
+  updatePauseHotkey: (keys: number[]) => void
   updateAutoAddDelay: (value: boolean) => void
   updateDefaultDelayVal: (value: string) => void
   updateAutoSelectElement: (value: boolean) => void
@@ -109,6 +110,8 @@ export interface ApplicationConfig {
   MinimizeAtLaunch: boolean
   Theme: string
   MinimizeToTray: boolean
+  /** HID codes of the hotkey that toggles macro output; empty for none. */
+  PauseHotkey?: number[]
 }
 
 /** What a quick tap of an OnHold macro's trigger does, see the backend TapMode. */
@@ -202,6 +205,7 @@ export type SystemAction =
   | { type: 'Media'; action: MediaAction }
   | { type: 'Macro'; action: MacroCallAction }
   | { type: 'Collection'; action: CollectionAction }
+  | { type: 'Text'; action: TextAction }
 // | { type: 'Brightness'; action: MonitorBrightnessAction }
 
 export type DirectoryAction =
@@ -228,6 +232,9 @@ export type MediaAction =
   | { type: 'PrevTrack' }
   | { type: 'StopTrack' }
   | { type: 'PlayPauseTrack' }
+
+/** Types text as keystrokes. */
+export type TextAction = { type: 'Type'; data: string }
 
 /** Runs another macro by name. */
 export type MacroCallAction = { type: 'Run'; data: string }

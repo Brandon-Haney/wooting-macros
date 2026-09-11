@@ -4950,10 +4950,13 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-single-instance"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/tauri-plugin-single-instance?branch=dev#632c48307ceb129f8aea3ca894fa631785dfc47f"
 dependencies = [
+ "log",
+ "serde",
+ "serde_json",
  "tauri",
- "windows-sys 0.42.0",
+ "thiserror",
+ "windows-sys 0.52.0",
  "zbus",
 ]
 

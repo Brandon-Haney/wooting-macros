@@ -185,6 +185,7 @@ impl Default for ApplicationConfig {
             minimize_at_launch: false,
             theme: "light".to_string(),
             minimize_to_tray: true,
+            pause_hotkey: Vec::new(),
         }
     }
 }
@@ -219,6 +220,9 @@ pub struct ApplicationConfig {
     pub minimize_at_launch: bool,
     pub theme: String,
     pub minimize_to_tray: bool,
+    /// HID codes of the keys that toggle macro output from anywhere. Empty for none.
+    #[serde(default)]
+    pub pause_hotkey: Vec<u32>,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
 #[serde(rename_all = "PascalCase")]

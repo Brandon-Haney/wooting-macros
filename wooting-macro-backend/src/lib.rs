@@ -1,6 +1,6 @@
 #[cfg(not(debug_assertions))]
 use std::path::PathBuf;
-use std::collections::{HashMap as StdHashMap, HashSet};
+use std::collections::{HashMap as StdHashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::{thread, time};
@@ -186,6 +186,17 @@ impl Macro {
                     };
                     debug!("Macro {:?} runs macro {:?}", self.name, target.name);
                     Box::pin(target.execute(context, depth + 1)).await?;
+                }
+                ActionEventType::SystemEventAction {
+                    data: system_event::SystemAction::Text { action },
+                } => {
+                    let system_event::TextAction::Type { data: text } = action;
+                    // Push and send under one lock so concurrent macros keep text/sentinel order.
+                    let mut pending = lock_or_recover(&context.pending_text);
+                    pending.push_back(text.clone());
+                    send_channel.send(rdev::EventType::KeyPress(rdev::Key::Unknown(
+                        TEXT_SENTINEL,
+                    )))?;
                 }
                 ActionEventType::SystemEventAction {
                     data: system_event::SystemAction::Collection { action },
@@ -388,6 +399,14 @@ type InjectedEvents = Arc<Mutex<Vec<rdev::EventType>>>;
 /// Minimum duration of one loop iteration in milliseconds, see `Macro::min_loop_iteration`.
 const MIN_LOOP_ITERATION_DELAY: u64 = 10;
 
+/// Text waiting to be typed by the executor, see `TEXT_SENTINEL`.
+type PendingText = Arc<Mutex<VecDeque<String>>>;
+
+/// A key code that never comes from a keyboard. Sent through the executor channel as
+/// `KeyPress(Key::Unknown(TEXT_SENTINEL))` right after pushing the text onto `PendingText`, so
+/// typed text keeps its place among the key events of the sequence.
+const TEXT_SENTINEL: u32 = 0xFFFF_FFF0;
+
 /// How long a looping macro keeps injecting events without the grab hook seeing any of them
 /// before it concludes the hook is gone and stops itself, see `spawn_macro_loop`.
 const HOOK_STALL_TIMEOUT: time::Duration = time::Duration::from_secs(1);
@@ -407,6 +426,8 @@ pub enum BackendCommand {
     },
     /// A macro started executing (for activity feedback in the UI).
     MacroFired { name: String },
+    /// Macro output was toggled by the pause hotkey.
+    ListeningChanged { listening: bool },
 }
 
 /// Everything the grab hook needs to start, stop and keep track of macro executions.
@@ -422,6 +443,10 @@ struct ExecutionContext {
     foreground: Arc<Mutex<Option<String>>>,
     /// Whether the hook thread answered the last supervisor check.
     hook_healthy: Arc<AtomicBool>,
+    /// Text queued for the executor, see `TEXT_SENTINEL`.
+    pending_text: PendingText,
+    /// HID codes of the hotkey that toggles macro output, see `ApplicationConfig::pause_hotkey`.
+    pause_hotkey: Arc<Mutex<Vec<u32>>>,
     running: RunningMacros,
     injected: InjectedEvents,
     is_listening: Arc<AtomicBool>,
@@ -460,6 +485,7 @@ pub struct MacroBackend {
     command_receiver: Mutex<Option<UnboundedReceiver<BackendCommand>>>,
     hook_events: Arc<AtomicU64>,
     hook_healthy: Arc<AtomicBool>,
+    pause_hotkey: Arc<Mutex<Vec<u32>>>,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -1005,6 +1031,7 @@ fn is_looping_trigger(context: &ExecutionContext, hid: u32) -> bool {
 fn keypress_executor_sender(
     mut rchan_execute: UnboundedReceiver<rdev::EventType>,
     injected: InjectedEvents,
+    pending_text: PendingText,
 ) {
     loop {
         let received_event = match &rchan_execute.blocking_recv() {
@@ -1014,6 +1041,16 @@ fn keypress_executor_sender(
                 continue;
             }
         };
+
+        if received_event == rdev::EventType::KeyPress(rdev::Key::Unknown(TEXT_SENTINEL)) {
+            let text = lock_or_recover(&pending_text).pop_front();
+            match text {
+                Some(text) => plugin::typing::type_text(&text)
+                    .unwrap_or_else(|err| error!("Error typing text: {}", err)),
+                None => warn!("Text sentinel without pending text"),
+            }
+            continue;
+        }
 
         lock_or_recover(&injected).push(received_event);
 
@@ -1269,6 +1306,7 @@ impl MacroBackend {
     /// Sets the config from the frontend to the files. This function is here to completely split the frontend off.
     pub async fn set_config(&self, config: ApplicationConfig) -> Result<()> {
         config.write_to_file()?;
+        *lock_or_recover(&self.pause_hotkey) = config.pause_hotkey.clone();
         *self.config.write().await = config;
         Ok(())
     }
@@ -1297,12 +1335,16 @@ impl MacroBackend {
             foreground: self.foreground.clone(),
             hook_healthy: self.hook_healthy.clone(),
             hook_events: self.hook_events.clone(),
+            pending_text: PendingText::default(),
+            pause_hotkey: self.pause_hotkey.clone(),
         };
+        *lock_or_recover(&self.pause_hotkey) = self.config.read().await.pause_hotkey.clone();
 
         // Create the executor
         let executor_injected = context.injected.clone();
+        let executor_text = context.pending_text.clone();
         thread::spawn(move || {
-            keypress_executor_sender(rchan_execute, executor_injected);
+            keypress_executor_sender(rchan_execute, executor_injected, executor_text);
         });
 
         spawn_grab_thread(&context, &inner_triggers);
@@ -1389,6 +1431,41 @@ fn grab_callback(
                         injected.swap_remove(position);
                         trace!("Passing through injected event {:?}", event.event_type);
                         return Some(event);
+                    }
+                }
+
+                // The pause hotkey works whether macros are on or off, so it is checked before
+                // the listening gate. Only the first press counts, not the auto-repeats.
+                if let rdev::EventType::KeyPress(key) = event.event_type {
+                    let hotkey = lock_or_recover(&context.pause_hotkey).clone();
+                    if !hotkey.is_empty() {
+                        let mut keys_pressed = keys_pressed.0.blocking_write();
+                        let is_repeat = keys_pressed.contains(&key);
+                        if !keys_pressed.contains(&key) {
+                            keys_pressed.push(key);
+                        }
+                        let mut held: Vec<u32> = keys_pressed
+                            .iter()
+                            .map(|x| *SCANCODE_TO_HID.get(x).unwrap_or(&0))
+                            .collect();
+                        drop(keys_pressed);
+                        held.sort_unstable();
+                        let mut wanted = hotkey.clone();
+                        wanted.sort_unstable();
+                        if held == wanted {
+                            if !is_repeat {
+                                let listening = !context.is_listening.load(Ordering::Relaxed);
+                                context.is_listening.store(listening, Ordering::Relaxed);
+                                info!(
+                                    "Pause hotkey: macro output {}",
+                                    if listening { "enabled" } else { "disabled" }
+                                );
+                                let _ = context
+                                    .commands
+                                    .send(BackendCommand::ListeningChanged { listening });
+                            }
+                            return None;
+                        }
                     }
                 }
 
@@ -1545,6 +1622,20 @@ fn grab_callback(
                         rdev::EventType::Wheel { .. } => Some(event),
                     }
                 } else {
+                    // Keep the held-key state current while paused, so the pause hotkey and the
+                    // first presses after resuming are judged correctly.
+                    match event.event_type {
+                        rdev::EventType::KeyPress(key) => {
+                            let mut keys_pressed = keys_pressed.0.blocking_write();
+                            if !keys_pressed.contains(&key) {
+                                keys_pressed.push(key);
+                            }
+                        }
+                        rdev::EventType::KeyRelease(key) => {
+                            keys_pressed.0.blocking_write().retain(|x| *x != key);
+                        }
+                        _ => {}
+                    }
                     Some(event)
                 }
     }
@@ -1573,6 +1664,7 @@ impl Default for MacroBackend {
             command_receiver: Mutex::new(Some(command_receiver)),
             hook_events: Arc::new(AtomicU64::new(0)),
             hook_healthy: Arc::new(AtomicBool::new(true)),
+            pause_hotkey: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }

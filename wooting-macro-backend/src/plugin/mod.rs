@@ -7,4 +7,5 @@ pub mod mouse;
 pub mod obs;
 pub mod phillips_hue;
 pub mod system_event;
+pub mod typing;
 pub mod util;

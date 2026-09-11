@@ -44,6 +44,15 @@ pub enum SystemAction {
     Macro { action: MacroAction },
     /// Handled by `Macro::execute`, which can reach the backend.
     Collection { action: CollectionAction },
+    /// Handled by `Macro::execute`, which queues it on the executor to keep ordering.
+    Text { action: TextAction },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]
+#[serde(tag = "type")]
+/// Types text as keystrokes (Unicode key events), see `plugin::typing`.
+pub enum TextAction {
+    Type { data: String },
 }
 
 impl SystemAction {
@@ -83,7 +92,9 @@ impl SystemAction {
                 };
                 util::direct_send_key(&send_channel, vec![rdev::Key::Unknown(code)]).await?;
             }
-            SystemAction::Macro { .. } | SystemAction::Collection { .. } => {
+            SystemAction::Macro { .. }
+            | SystemAction::Collection { .. }
+            | SystemAction::Text { .. } => {
                 // Intercepted earlier by Macro::execute; nothing to do here.
             }
             SystemAction::Clipboard { action } => match action {

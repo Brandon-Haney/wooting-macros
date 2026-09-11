@@ -36,9 +36,9 @@ remaps, and reliable across a whole gaming session.
 | Status bar / activity feedback | done | Hook alive, foreground application, armed collections, last macro fired |
 | Tray menu with collection states | done | See and toggle collections from the tray icon |
 | Import / export / duplicate | done | Collections and macros to JSON files; duplicate into another collection (upstream #161, #162) |
-| Type text element (upstream #237) | next | Text as keystrokes for apps that block paste |
+| Type text element (upstream #237) | done | Text as keystrokes for apps that block paste |
 | Per-macro application scope | done | "Only in these applications" on a macro, layered on the collection link |
-| Global pause hotkey | proposed | Keyboard shortcut for Disable Macro Output |
+| Global pause hotkey | done | Settings > Macro Output; works while paused too, keys are swallowed |
 | Versioning and release builds | done | 1.2.0; GitHub Releases with installers; updater on our own key |
 
 ## Quality of life
@@ -61,7 +61,7 @@ remaps, and reliable across a whole gaming session.
 | Item | Status | Notes |
 | --- | --- | --- |
 | Backlog triage of upstream issues and PRs | done | [BACKLOG.md](BACKLOG.md) |
-| Debug builds crash on Rust 1.98 (single-instance plugin) | next | Pin a fixed plugin or patch the null check; release builds unaffected |
+| Debug builds crash on Rust 1.98 (single-instance plugin) | done | Plugin vendored under src-tauri/vendor with a null guard |
 | Tauri 2 migration, dependency refresh | later | Phase 3 |
 | Rebase the rdev fork on upstream Narsil/rdev | later | Phase 3 |
 | Linux/Wayland stability | later | Phase 3 |

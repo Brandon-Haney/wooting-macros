@@ -120,6 +120,13 @@ fn spawn_command_processor(app: tauri::AppHandle) {
                     }
                     Ok(None)
                 }
+                BackendCommand::ListeningChanged { listening } => {
+                    if let Err(err) = app.emit_all(LISTENING_CHANGED_EVENT, listening) {
+                        error!("error notifying the frontend of macro output: {}", err);
+                    }
+                    refresh_tray_menu(&app).await;
+                    Ok(None)
+                }
             };
             match result {
                 Ok(Some(data)) => {

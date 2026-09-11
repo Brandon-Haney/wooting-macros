@@ -96,6 +96,7 @@ export const checkIfElementIsEditable = (element: ActionEventType): boolean => {
         return false
       case 'Macro':
       case 'Collection':
+      case 'Text':
         return true
       default:
         return false
@@ -137,6 +138,10 @@ export const getElementDisplayString = (element: ActionEventType): string => {
           return element.data.action.data !== ''
             ? `Run Macro: ${element.data.action.data}`
             : 'Run Macro'
+        case 'Text':
+          return element.data.action.data !== ''
+            ? `Type: ${element.data.action.data.length > 24 ? element.data.action.data.slice(0, 24) + '…' : element.data.action.data}`
+            : 'Type Text'
         case 'Collection':
           return element.data.action.data !== ''
             ? `${element.data.action.type} Collection: ${element.data.action.data}`

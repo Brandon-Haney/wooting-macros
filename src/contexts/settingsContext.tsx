@@ -35,7 +35,8 @@ function SettingsProvider({ children }: SettingsProviderProps) {
     AutoSelectElement: true,
     MinimizeAtLaunch: false,
     Theme: 'light',
-    MinimizeToTray: true
+    MinimizeToTray: true,
+    PauseHotkey: []
   })
   const toast = useToast()
 
@@ -101,6 +102,11 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       return { ...config, AutoSelectElement: value }
     })
   }, [])
+  const updatePauseHotkey = useCallback((keys: number[]) => {
+    setConfig((config) => {
+      return { ...config, PauseHotkey: keys }
+    })
+  }, [])
   const updateTheme = useCallback(
     (value: string) => {
       setConfig((config) => {
@@ -120,6 +126,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateAutoAddDelay,
       updateDefaultDelayVal,
       updateAutoSelectElement,
+      updatePauseHotkey,
       updateTheme
     }),
     [
@@ -130,6 +137,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateAutoAddDelay,
       updateDefaultDelayVal,
       updateAutoSelectElement,
+      updatePauseHotkey,
       updateTheme
     ]
   )

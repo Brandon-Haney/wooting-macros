@@ -134,6 +134,16 @@ export class SystemEvent {
       description: 'Plays or pauses media playback.'
     }
   }
+  static get TypeText(): SystemEventInfo {
+    return {
+      type: 'Text',
+      subtype: 'Type',
+      displayString: 'Type Text',
+      defaultData: { type: 'Text', action: { type: 'Type', data: '' } },
+      description:
+        'Types the text as keystrokes, for chat boxes and launchers that do not accept a paste.'
+    }
+  }
   static get RunMacro(): SystemEventInfo {
     return {
       type: 'Macro',
@@ -176,6 +186,7 @@ export class SystemEvent {
     SystemEvent.OpenFolder,
     SystemEvent.OpenWebsite,
     SystemEvent.Clipboard,
+    SystemEvent.TypeText,
     SystemEvent.Sarcasm,
     SystemEvent.IncreaseVolume,
     SystemEvent.DecreaseVolume,

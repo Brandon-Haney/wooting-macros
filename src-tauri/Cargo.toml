@@ -35,9 +35,9 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies.tauri-plugin-single-instance]
-git = "https://github.com/tauri-apps/tauri-plugin-single-instance"
-#change this to stable release once it is available
-branch = "dev"
+# Vendored copy of the plugin (see vendor/): the git versions dereference a null pointer in the
+# Windows window procedure, which aborts debug builds on Rust >= 1.98.
+path = "vendor/tauri-plugin-single-instance"
 
 [profile.release]
 lto = true

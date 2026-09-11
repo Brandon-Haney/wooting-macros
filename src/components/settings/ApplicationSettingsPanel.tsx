@@ -1,6 +1,7 @@
 import { Divider, Text, VStack } from '@chakra-ui/react'
 import NumberInputSetting from './NumberInputSetting'
 import ToggleSetting from './ToggleSetting'
+import HotkeySetting from './HotkeySetting'
 import { useSettingsContext } from '../../contexts/settingsContext'
 
 export default function ApplicationSettingsPanel() {
@@ -11,7 +12,8 @@ export default function ApplicationSettingsPanel() {
     updateMinimizeOnClose,
     updateAutoAddDelay,
     updateDefaultDelayVal,
-    updateAutoSelectElement
+    updateAutoSelectElement,
+    updatePauseHotkey
   } = useSettingsContext()
 
   return (
@@ -42,6 +44,20 @@ export default function ApplicationSettingsPanel() {
           description="Closing the window with the close button in its top-right corner hides the app to the system tray instead of quitting it, so macros keep working. Use Quit in the tray icon menu to exit."
           value={config.MinimizeToTray}
           onChange={updateMinimizeOnClose}
+        />
+        <Divider />
+      </VStack>
+      <VStack w="full">
+        <Text w="full" textStyle="miniHeader">
+          Macro Output
+        </Text>
+      </VStack>
+      <VStack w="full" spacing={[4]}>
+        <HotkeySetting
+          title="Pause hotkey"
+          description="Toggles macro output from anywhere, without opening the window. The keys are swallowed, so pick a combination you do not use elsewhere."
+          value={config.PauseHotkey ?? []}
+          onChange={updatePauseHotkey}
         />
         <Divider />
       </VStack>

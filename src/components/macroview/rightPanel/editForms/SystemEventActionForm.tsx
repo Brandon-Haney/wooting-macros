@@ -4,6 +4,7 @@ import EmptyForm from './EmptyForm'
 import OpenEventForm from './OpenEventForm'
 import MacroCallForm from './MacroCallForm'
 import CollectionActionForm from './CollectionActionForm'
+import TypeTextForm from './TypeTextForm'
 
 interface Props {
   selectedElement: SystemEventAction
@@ -28,6 +29,13 @@ export default function SystemEventActionForm({
     case 'Macro':
       return (
         <MacroCallForm
+          selectedElementId={selectedElementId}
+          selectedElement={selectedElement}
+        />
+      )
+    case 'Text':
+      return (
+        <TypeTextForm
           selectedElementId={selectedElementId}
           selectedElement={selectedElement}
         />
