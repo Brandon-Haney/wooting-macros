@@ -69,10 +69,10 @@ export default function StatusBar() {
             {!listening ? 'Paused' : hookOk ? 'Hook OK' : 'Hook down'}
           </Badge>
         </Tooltip>
-        <Text fontSize="xs" opacity={0.8} noOfLines={1}>
-          Focus: {status?.foreground ?? 'unknown'}
-        </Text>
       </HStack>
+      <Text fontSize="xs" opacity={0.8} noOfLines={1}>
+        Focus: {status?.foreground ?? 'unknown'}
+      </Text>
       <Text fontSize="xs" opacity={0.8} noOfLines={1}>
         Armed: {armed.length > 0 ? armed.join(', ') : 'none'}
       </Text>
