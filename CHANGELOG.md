@@ -4,9 +4,16 @@ All notable changes to this fork. Versions are git tags; each tag is built and p
 
 ## Unreleased
 
+Nothing yet.
+
+## 1.3.0 — 2026-09-11
+
 ### Added
 - Timeline view of the sequence (List / Timeline toggle above the sequence, remembered): one row per key, a bar per press, system events on an Events row, ruler with zoom (Ctrl + wheel, Fit), the trigger press at 0, the end of one iteration and a bracket labelled by the macro type. Bars can be dragged (Shift snaps to 10 ms), resized at their edges, drawn on empty rows, moved to another key, multi-selected with Shift-click, nudged with the arrow keys and deleted; dragging the end marker sets the gap before the next loop. Edits are written back into the same sequence the list shows.
-- Simulation panel (play button above the sequence): plays the macro virtually with the backend's rules for hold threshold, tap mode, repeat count and minimum loop time. Start presses the trigger, Release lets it go; shows the state, loop count, keys currently held, everything sent so far and a preview of the text it would type (US layout). A playhead moves over the timeline.
+- Simulation panel (play button above the sequence): plays the macro virtually with the backend's rules for hold threshold, tap mode, repeat count and minimum loop time. Start presses the trigger, Release lets it go; shows the state, loop count, keys currently held, everything sent so far and a preview of the text it would type (US layout). A playhead moves over the timeline. Looping macros show a faded ghost of the next iteration after the end marker.
+- Test pad in the simulation panel: "Run for real" plays the sequence once through the actual executor with the cursor in the panel's text box.
+- Timeline extras: Ctrl+drag selects several bars, a click on empty space places the record cursor so the next recording is inserted there (with a live playhead while recording), and palette elements can be dragged onto the timeline at a time.
+- Palette groups: Functions (run macro, collection controls), Media and Volume, System, each with a hint on the header.
 - Recording keeps overlapping keys as overlapping presses instead of flattening them to a list of Down and Up cards; the list shows presses live while recording.
 - Browser preview for UI work: `yarn dev` then `http://localhost:1420/?mock` runs the frontend without Tauri on canned data.
 - Type Text element: text typed as keystrokes (Unicode key events), for chat boxes and launchers that block paste. A new line presses Enter.
