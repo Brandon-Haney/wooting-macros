@@ -24,6 +24,13 @@ export default function SelectElementButton({
     'primary-light.300',
     'primary-dark.600'
   )
+  const keycapShadow = useColorModeValue(
+    '0 1px 1px rgba(0, 0, 0, 0.12)',
+    '0 1px 1px rgba(0, 0, 0, 0.5)'
+  )
+  const isKeycap =
+    properties.type === 'KeyPressEventAction' ||
+    properties.type === 'MouseEventAction'
 
   const handleAddElement = useCallback(() => {
     if (config.AutoAddDelay) {
@@ -67,9 +74,21 @@ export default function SelectElementButton({
         color={textColor}
         border="1px"
         borderColor={borderColour}
-        rounded='md'
+        rounded="md"
         onClick={handleAddElement}
         transition="ease-out 150ms"
+        // Keys and mouse buttons look like keycaps, matching the Kbd element used elsewhere.
+        {...(isKeycap
+          ? {
+              borderBottomWidth: '3px',
+              boxShadow: keycapShadow,
+              _active: {
+                transform: 'translateY(2px)',
+                borderBottomWidth: '1px',
+                boxShadow: 'none'
+              }
+            }
+          : {})}
       >
         <Text
           w="full"
