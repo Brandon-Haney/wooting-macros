@@ -64,6 +64,7 @@ export type SettingsState = {
   updateMinimizeOnStartup: (value: boolean) => void
   updateMinimizeOnClose: (value: boolean) => void
   updatePauseHotkey: (keys: number[]) => void
+  updateRecordFixedTimings: (value: boolean) => void
   updateAutoAddDelay: (value: boolean) => void
   updateDefaultDelayVal: (value: string) => void
   updateAutoSelectElement: (value: boolean) => void
@@ -112,6 +113,8 @@ export interface ApplicationConfig {
   MinimizeToTray: boolean
   /** HID codes of the hotkey that toggles macro output; empty for none. */
   PauseHotkey?: number[]
+  /** Recording uses the default delay for delays and press durations instead of measured times. */
+  RecordFixedTimings?: boolean
 }
 
 /** What a quick tap of an OnHold macro's trigger does, see the backend TapMode. */

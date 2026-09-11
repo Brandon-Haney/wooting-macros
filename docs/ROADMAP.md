@@ -45,9 +45,9 @@ remaps, and reliable across a whole gaming session.
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Bulk element edits (upstream #262) | later | Multi-select, set all delays, set all durations |
+| Bulk element edits (upstream #262) | done | Edit All: set every delay, compact delays, remove delays, set every press duration. Multi-select still later |
 | Inline element editing on the sequence card | later | |
-| Recording with a single global delay / compact delays | later | |
+| Recording with a single global delay / compact delays | done | Settings: Record with fixed timings; Compact delays in Edit All |
 | Sound on macro activation (upstream #144) | later | rodio is already a dependency |
 | Diagnostics export | later | Zip log and config |
 | Default element duration setting (upstream #163) | later | Macro Defaults tab is still a placeholder |

@@ -12,7 +12,7 @@ import {
   useDisclosure,
   VStack
 } from '@chakra-ui/react'
-import { DeleteIcon, SettingsIcon, TimeIcon } from '@chakra-ui/icons'
+import { DeleteIcon, EditIcon, SettingsIcon, TimeIcon } from '@chakra-ui/icons'
 import { useCallback } from 'react'
 import { Keypress, MousePressAction } from '../../../types'
 import { useMacroContext } from '../../../contexts/macroContext'
@@ -21,6 +21,7 @@ import { useSettingsContext } from '../../../contexts/settingsContext'
 import { KeyType } from '../../../constants/enums'
 import { checkIfKeypress, checkIfMouseButton } from '../../../constants/utils'
 import ClearSequenceModal from './ClearSequenceModal'
+import BulkEditModal from './BulkEditModal'
 import { RecordIcon, StopIcon } from '../../icons'
 import SortableList from './SortableList'
 import useMainBgColour from '../../../hooks/useMainBgColour'
@@ -39,6 +40,11 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
   } = useMacroContext()
   const { config } = useSettingsContext()
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const {
+    isOpen: isBulkOpen,
+    onOpen: onBulkOpen,
+    onClose: onBulkClose
+  } = useDisclosure()
 
   const onItemChanged = useCallback(
     (
@@ -49,6 +55,10 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
     ) => {
       if (item === undefined) {
         return
+      }
+      // Fixed timings: ignore how long the user waited or held the key.
+      if (config.RecordFixedTimings) {
+        timeDiff = config.DefaultDelayValue
       }
       // If necessary, adjust previous element.
       if (isUpEvent && prevItem !== undefined) {
@@ -122,7 +132,14 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         }
       }
     },
-    [onElementAdd, onElementsAdd, sequence.length, updateElement]
+    [
+      config.DefaultDelayValue,
+      config.RecordFixedTimings,
+      onElementAdd,
+      onElementsAdd,
+      sequence.length,
+      updateElement
+    ]
   )
 
   const { recording, startRecording, stopRecording } =
@@ -190,6 +207,16 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
           Add Delay
         </Button>
         <Button
+          variant="brandRecord"
+          leftIcon={<EditIcon />}
+          size={['xs', 'sm', 'md']}
+          fontSize={['xs', 'xs', 'lg']}
+          onClick={onBulkOpen}
+          isDisabled={sequence.length === 0}
+        >
+          Edit All
+        </Button>
+        <Button
           variant="brandWarning"
           leftIcon={<DeleteIcon />}
           size={['xs', 'sm', 'md']}
@@ -215,6 +242,7 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         </Tooltip>
       </HStack>
       {/** Header End */}
+      <BulkEditModal isOpen={isBulkOpen} onClose={onBulkClose} />
       <ClearSequenceModal
         isOpen={isOpen}
         onClose={onClose}

@@ -186,6 +186,7 @@ impl Default for ApplicationConfig {
             theme: "light".to_string(),
             minimize_to_tray: true,
             pause_hotkey: Vec::new(),
+            record_fixed_timings: false,
         }
     }
 }
@@ -223,6 +224,10 @@ pub struct ApplicationConfig {
     /// HID codes of the keys that toggle macro output from anywhere. Empty for none.
     #[serde(default)]
     pub pause_hotkey: Vec<u32>,
+    /// When recording a sequence, use the default delay value for every delay and press
+    /// duration instead of the measured timings.
+    #[serde(default)]
+    pub record_fixed_timings: bool,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
 #[serde(rename_all = "PascalCase")]

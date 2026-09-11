@@ -13,7 +13,8 @@ export default function ApplicationSettingsPanel() {
     updateAutoAddDelay,
     updateDefaultDelayVal,
     updateAutoSelectElement,
-    updatePauseHotkey
+    updatePauseHotkey,
+    updateRecordFixedTimings
   } = useSettingsContext()
 
   return (
@@ -67,6 +68,13 @@ export default function ApplicationSettingsPanel() {
         </Text>
       </VStack>
       <VStack w="full" spacing={[4]}>
+        <ToggleSetting
+          title="Record with fixed timings"
+          description="When recording a sequence, every delay and key press duration uses the default delay value below instead of how long you actually waited or held the key. Gives clean, uniform macros."
+          value={config.RecordFixedTimings ?? false}
+          onChange={updateRecordFixedTimings}
+        />
+        <Divider />
         <ToggleSetting
           title="Auto-add Delay"
           description="When enabled, a delay element is automatically added to the sequence, if the last element of the sequence is not a delay."

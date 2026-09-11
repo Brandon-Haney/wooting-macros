@@ -36,7 +36,8 @@ function SettingsProvider({ children }: SettingsProviderProps) {
     MinimizeAtLaunch: false,
     Theme: 'light',
     MinimizeToTray: true,
-    PauseHotkey: []
+    PauseHotkey: [],
+    RecordFixedTimings: false
   })
   const toast = useToast()
 
@@ -107,6 +108,11 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       return { ...config, PauseHotkey: keys }
     })
   }, [])
+  const updateRecordFixedTimings = useCallback((value: boolean) => {
+    setConfig((config) => {
+      return { ...config, RecordFixedTimings: value }
+    })
+  }, [])
   const updateTheme = useCallback(
     (value: string) => {
       setConfig((config) => {
@@ -127,6 +133,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateDefaultDelayVal,
       updateAutoSelectElement,
       updatePauseHotkey,
+      updateRecordFixedTimings,
       updateTheme
     }),
     [
@@ -138,6 +145,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateDefaultDelayVal,
       updateAutoSelectElement,
       updatePauseHotkey,
+      updateRecordFixedTimings,
       updateTheme
     ]
   )
